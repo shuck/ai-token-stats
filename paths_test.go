@@ -124,9 +124,7 @@ func TestKnownCandidatesCodexEnv(t *testing.T) {
 
 func TestDiscoverAgentPath(t *testing.T) {
 	root := t.TempDir()
-	// Isolate default-location candidates (e.g. the real ~/.claude/projects
-	// on this machine) so discovery must go through the scan roots.
-	t.Setenv("USERPROFILE", t.TempDir())
+	isolateAgentEnv(t)
 
 	codex := filepath.Join(root, "ai-data", "codex")
 	if err := os.MkdirAll(filepath.Join(codex, "sessions"), 0o755); err != nil {
@@ -169,6 +167,9 @@ func TestDiscoverAgentPath(t *testing.T) {
 
 func TestDiscoverPrefersNewest(t *testing.T) {
 	root := t.TempDir()
+	// Isolate default-location candidates (e.g. the real ~/.codex or a
+	// CODEX_HOME set on the host) so discovery must go through the scan roots.
+	isolateAgentEnv(t)
 	old := filepath.Join(root, "old")
 	newd := filepath.Join(root, "new")
 	for _, d := range []string{old, newd} {
@@ -190,6 +191,16 @@ func TestDiscoverPrefersNewest(t *testing.T) {
 	if got := discoverAgentPath(agentCodex, []string{root}); got != newd {
 		t.Fatalf("expected newest %q, got %q", newd, got)
 	}
+}
+
+// isolateAgentEnv blanks out the environment knobs that agent discovery reads,
+// so tests exercise only the scan roots they create instead of leaking in
+// default locations or env vars from the host machine.
+func isolateAgentEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("USERPROFILE", t.TempDir())
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("ZCODE_DATA", "")
 }
 
 func TestTestWritable(t *testing.T) {
