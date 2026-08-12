@@ -29,9 +29,28 @@ type app struct {
 	hoverIndex  int
 	hoverX      int
 	hoverY      int
-	lastClick   time.Time
 	cfg         *config
 	scanning    bool
+	clicks      clickDetector
+}
+
+const doubleClickInterval = 500 * time.Millisecond
+
+// clickDetector decides whether two left-clicks form a double-click.
+// walk's NotifyIcon does not dispatch WM_LBUTTONDBLCLK, so the second press
+// of a double-click never fires MouseDown; both mouse-up messages are
+// delivered though, so detection runs on MouseUp.
+type clickDetector struct {
+	last time.Time
+}
+
+func (d *clickDetector) onMouseUp(now time.Time) bool {
+	if !d.last.IsZero() && now.Sub(d.last) <= doubleClickInterval {
+		d.last = time.Time{}
+		return true
+	}
+	d.last = now
+	return false
 }
 
 func makeIcon() (*walk.Icon, error) {
@@ -265,16 +284,9 @@ func (a *app) run() error {
 	if err := ni.SetVisible(true); err != nil {
 		return err
 	}
-	ni.MouseDown().Attach(func(x, y int, button walk.MouseButton) {
-		if button != walk.LeftButton {
-			return
-		}
-		now := time.Now()
-		if now.Sub(a.lastClick) < 500*time.Millisecond {
-			a.lastClick = time.Time{}
+	ni.MouseUp().Attach(func(x, y int, button walk.MouseButton) {
+		if button == walk.LeftButton && a.clicks.onMouseUp(time.Now()) {
 			a.showWindow()
-		} else {
-			a.lastClick = now
 		}
 	})
 
