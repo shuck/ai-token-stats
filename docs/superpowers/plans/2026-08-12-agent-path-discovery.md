@@ -1090,7 +1090,7 @@ func (a *app) scanAll(force bool) bool {
 
 Expected: build/vet 无输出退出码 0；测试全部 PASS。
 
-注意：Step 5 引用了 `a.showSettingsDialog()`，该函数在 Task 6 才实现；若按顺序执行，Task 5 结尾的 build 会因 undefined 失败。因此 Task 5 与 Task 6 合并验证：先完成 Task 6，再执行本步命令。若想单独验证 Task 5，可临时把 `settingsAction.Triggered()` 换成 `func() {}`，Task 6 完成后再恢复。
+注意：本任务引用的 `a.showSettingsDialog()` 由「设置对话框」任务先行实现并提交。执行顺序：先完成设置对话框任务，再执行本任务。
 
 - [ ] **Step 7: 提交**
 
@@ -1254,7 +1254,7 @@ Expected: build/vet 无输出退出码 0；测试全部 PASS。
 - [ ] **Step 3: 提交**
 
 ```powershell
-git add settings.go main.go
+git add settings.go
 git commit -m "feat: add agent path settings dialog"
 ```
 
