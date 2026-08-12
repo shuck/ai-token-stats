@@ -16,14 +16,6 @@ import (
 )
 
 const (
-	codexHome     = `D:\ai-data\codex`
-	sessionsRoot  = codexHome + `\sessions`
-	archivedRoot  = codexHome + `\archived_sessions`
-	logsDB        = codexHome + `\logs_2.sqlite`
-	stateDB       = codexHome + `\state_5.sqlite`
-	zcodeDB       = `D:\ai-data\zcode-data\cli\db\db.sqlite`
-	claudeRoot    = `C:\Users\zc\.claude\projects`
-	opencodeDB    = `C:\Users\zc\.local\share\opencode\opencode.db`
 	shanghaiZone  = "Asia/Shanghai"
 	agentAll      = "all"
 	agentCodex    = "Codex"
@@ -271,8 +263,8 @@ func loadRolloutRecords(changed map[string]bool) ([]record, map[string]bool, map
 	}
 
 	if changed == nil {
-		walkJSONL(sessionsRoot, visit)
-		walkJSONL(archivedRoot, visit)
+		walkJSONL(sessionsRoot(), visit)
+		walkJSONL(archivedRoot(), visit)
 	} else {
 		for path := range changed {
 			if strings.HasSuffix(strings.ToLower(path), ".jsonl") {
@@ -302,10 +294,10 @@ var modelRe = regexp.MustCompile(`model=([A-Za-z0-9_.:-]+)`)
 
 func loadThreadModels() map[string]string {
 	result := map[string]string{}
-	if _, err := os.Stat(stateDB); err != nil {
+	if _, err := os.Stat(stateDB()); err != nil {
 		return result
 	}
-	db, err := sql.Open("sqlite", "file:"+stateDB+"?mode=ro&_pragma=query_only(1)")
+	db, err := sql.Open("sqlite", "file:"+stateDB()+"?mode=ro&_pragma=query_only(1)")
 	if err != nil {
 		return result
 	}
@@ -326,10 +318,10 @@ func loadThreadModels() map[string]string {
 
 func loadLogModels() map[string]string {
 	result := map[string]string{}
-	if _, err := os.Stat(logsDB); err != nil {
+	if _, err := os.Stat(logsDB()); err != nil {
 		return result
 	}
-	db, err := sql.Open("sqlite", "file:"+logsDB+"?mode=ro&_pragma=query_only(1)")
+	db, err := sql.Open("sqlite", "file:"+logsDB()+"?mode=ro&_pragma=query_only(1)")
 	if err != nil {
 		return result
 	}
@@ -357,10 +349,10 @@ func loadLogModels() map[string]string {
 }
 
 func loadLogFallback(withTokenCount map[string]bool, contextByThread map[string]int64, since int64) ([]record, int64) {
-	if _, err := os.Stat(logsDB); err != nil {
+	if _, err := os.Stat(logsDB()); err != nil {
 		return nil, 0
 	}
-	db, err := sql.Open("sqlite", "file:"+logsDB+"?mode=ro&_pragma=query_only(1)")
+	db, err := sql.Open("sqlite", "file:"+logsDB()+"?mode=ro&_pragma=query_only(1)")
 	if err != nil {
 		return nil, 0
 	}
@@ -481,10 +473,10 @@ func loadLogFallback(withTokenCount map[string]bool, contextByThread map[string]
 }
 
 func loadZCodeRecords(since int64) []record {
-	if _, err := os.Stat(zcodeDB); err != nil {
+	if _, err := os.Stat(zcodeDB()); err != nil {
 		return nil
 	}
-	db, err := sql.Open("sqlite", "file:"+zcodeDB+"?mode=ro&_pragma=query_only(1)")
+	db, err := sql.Open("sqlite", "file:"+zcodeDB()+"?mode=ro&_pragma=query_only(1)")
 	if err != nil {
 		return nil
 	}
@@ -567,7 +559,7 @@ func loadClaudeRecords(changed map[string]bool) []record {
 	records := []record{}
 	if changed == nil {
 		changed = map[string]bool{}
-		walkJSONL(claudeRoot, func(path string) {
+		walkJSONL(claudeRoot(), func(path string) {
 			changed[path] = true
 		})
 	}
@@ -629,10 +621,10 @@ type openCodeModelJSON struct {
 }
 
 func loadOpenCodeRecords(since int64) []record {
-	if _, err := os.Stat(opencodeDB); err != nil {
+	if _, err := os.Stat(opencodeDB()); err != nil {
 		return nil
 	}
-	db, err := sql.Open("sqlite", "file:"+opencodeDB+"?mode=ro&_pragma=query_only(1)")
+	db, err := sql.Open("sqlite", "file:"+opencodeDB()+"?mode=ro&_pragma=query_only(1)")
 	if err != nil {
 		return nil
 	}

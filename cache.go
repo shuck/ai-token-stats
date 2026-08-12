@@ -7,15 +7,13 @@ import (
 	"strings"
 )
 
-const cacheDB = `D:\ai-data\codex\codex-usage-tool\ai-token-stats-cache.db`
-
 type fileMeta struct {
 	Size  int64
 	Mtime int64
 }
 
 func openCache() (*sql.DB, error) {
-	db, err := sql.Open("sqlite", cacheDB)
+	db, err := sql.Open("sqlite", cacheDB())
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +170,7 @@ func ensureCached(agent string) error {
 	defer db.Close()
 
 	if agent == agentAll || agent == agentCodex {
-		changed, err := changedFilePaths(db, agentCodex, sessionsRoot, archivedRoot)
+		changed, err := changedFilePaths(db, agentCodex, sessionsRoot(), archivedRoot())
 		if err != nil {
 			return err
 		}
@@ -194,7 +192,7 @@ func ensureCached(agent string) error {
 	}
 
 	if agent == agentAll || agent == agentClaude {
-		changed, err := changedFilePaths(db, agentClaude, claudeRoot)
+		changed, err := changedFilePaths(db, agentClaude, claudeRoot())
 		if err != nil {
 			return err
 		}

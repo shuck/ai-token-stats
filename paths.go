@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -297,3 +298,82 @@ func matchAgentDir(agent, path string) bool {
 	}
 	return false
 }
+
+var allAgents = []string{agentCodex, agentZcode, agentClaude, agentOpenCode}
+
+// Runtime locations, set once by initPaths.
+var (
+	appDir      string
+	configPath  string
+	cacheDBPath string
+	agentPaths  = map[string]string{}
+)
+
+func initPaths() (*config, error) {
+	dir, err := resolveAppDir()
+	if err != nil {
+		return nil, err
+	}
+	appDir = dir
+	configPath = filepath.Join(appDir, "config.json")
+	cacheDBPath = filepath.Join(appDir, "ai-token-stats-cache.db")
+
+	cfg, err := loadConfig(configPath)
+	if err != nil {
+		backup := fmt.Sprintf("%s.corrupt-%d", configPath, time.Now().Unix())
+		if renameErr := os.Rename(configPath, backup); renameErr == nil {
+			fmt.Fprintf(os.Stderr, "config corrupt, backed up to %s\n", backup)
+		}
+		cfg = newConfig()
+	}
+	for _, agent := range allAgents {
+		if p := cfg.Agents[agent].Path; pathExists(p) {
+			agentPaths[agent] = p
+		} else {
+			agentPaths[agent] = ""
+		}
+	}
+	return cfg, nil
+}
+
+func resolveAppDir() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Dir(exe)
+	if testWritable(dir) == nil {
+		return dir, nil
+	}
+	fallback := filepath.Join(os.Getenv("APPDATA"), "ai-token-stats")
+	if err := os.MkdirAll(fallback, 0o755); err != nil {
+		return "", err
+	}
+	if err := testWritable(fallback); err != nil {
+		return "", fmt.Errorf("no writable location: %s and %s", dir, fallback)
+	}
+	return fallback, nil
+}
+
+func testWritable(dir string) error {
+	f, err := os.CreateTemp(dir, ".write-test-*")
+	if err != nil {
+		return err
+	}
+	name := f.Name()
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return os.Remove(name)
+}
+
+// Data source getters, backed by the runtime-discovered config.
+func codexHome() string    { return agentPaths[agentCodex] }
+func sessionsRoot() string { return filepath.Join(codexHome(), "sessions") }
+func archivedRoot() string { return filepath.Join(codexHome(), "archived_sessions") }
+func logsDB() string       { return filepath.Join(codexHome(), "logs_2.sqlite") }
+func stateDB() string      { return filepath.Join(codexHome(), "state_5.sqlite") }
+func zcodeDB() string      { return agentPaths[agentZcode] }
+func claudeRoot() string   { return agentPaths[agentClaude] }
+func opencodeDB() string   { return agentPaths[agentOpenCode] }
+func cacheDB() string      { return cacheDBPath }

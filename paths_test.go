@@ -191,3 +191,9 @@ func TestDiscoverPrefersNewest(t *testing.T) {
 		t.Fatalf("expected newest %q, got %q", newd, got)
 	}
 }
+
+func TestTestWritable(t *testing.T) {
+	if err := testWritable(t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+}
