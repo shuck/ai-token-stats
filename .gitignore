@@ -1,0 +1,4 @@
+# Runtime state, regenerated per machine
+config.json
+ai-token-stats-cache.db
+config.json.corrupt-*
