@@ -122,6 +122,7 @@ name = "ai-token-stats"
 version = "0.1.0"
 dependencies = [
  "ai-token-stats-core",
+ "chrono",
  "eframe",
  "egui",
  "tray-icon",

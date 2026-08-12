@@ -1,6 +1,7 @@
 pub mod cache;
 pub mod claude;
 pub mod codex;
+pub mod collect;
 pub mod config;
 pub mod discovery;
 pub mod opencode;

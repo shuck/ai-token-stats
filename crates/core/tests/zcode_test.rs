@@ -2,11 +2,19 @@ use ai_token_stats_core::zcode::load_zcode_records;
 use rusqlite::Connection;
 use std::fs;
 
+struct Guard(std::path::PathBuf);
+impl Drop for Guard {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
 #[test]
 fn zcode_placeholder_then_update() {
     let dir = std::env::temp_dir().join(format!("ats-zcode-test-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
+    let _guard = Guard(dir.clone());
     let path = dir.join("db.sqlite");
     let conn = Connection::open(&path).unwrap();
     conn.execute_batch(

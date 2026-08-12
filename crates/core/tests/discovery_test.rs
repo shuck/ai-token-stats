@@ -10,6 +10,13 @@ fn tmp(name: &str) -> PathBuf {
     d
 }
 
+struct Guard(PathBuf);
+impl Drop for Guard {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
 fn isolate_env() {
     std::env::set_var(
         "USERPROFILE",
@@ -40,6 +47,7 @@ fn validate_codex_and_claude_dirs() {
 fn discover_codex_and_claude_and_zcode_and_opencode() {
     isolate_env();
     let root = tmp("discover");
+    let _guard = Guard(root.clone());
     let codex = root.join("ai-data").join("codex");
     fs::create_dir_all(codex.join("sessions")).unwrap();
     fs::create_dir_all(codex.join("archived_sessions")).unwrap();

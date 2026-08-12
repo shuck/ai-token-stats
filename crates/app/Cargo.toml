@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 ai-token-stats-core = { path = "../core" }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 eframe = "0.27"
 egui = "0.27"
 tray-icon = "0.14"

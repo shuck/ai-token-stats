@@ -192,22 +192,29 @@ pub fn discover_agent_path(
             continue;
         }
         let mut visited = 0usize;
-        for entry in WalkDir::new(root)
-            .max_depth(limits.max_depth)
+        // Go 版语义：目录下降深度 > max_depth 时不再深入，但深度恰为 max_depth
+        // 的目录内的文件仍会被访问；目录数/时间超限时跳过当前子树而不是中断整盘。
+        let walker = WalkDir::new(root)
+            .max_depth(limits.max_depth + 1)
             .into_iter()
-            .filter_entry(|e| {
+            .filter_entry(move |e| {
                 if e.depth() == 0 {
                     return true;
                 }
-                !e.file_type().is_dir()
-                    || !SKIP_DIRS.contains(&e.file_name().to_string_lossy().as_ref())
-            })
-        {
+                if e.file_type().is_dir() {
+                    if e.depth() > limits.max_depth
+                        || visited >= limits.max_dirs
+                        || started.elapsed() > limits.max_duration
+                    {
+                        return false;
+                    }
+                    visited += 1;
+                    return !SKIP_DIRS.contains(&e.file_name().to_string_lossy().as_ref());
+                }
+                true
+            });
+        for entry in walker {
             let Ok(e) = entry else { continue };
-            visited += 1;
-            if visited > limits.max_dirs || started.elapsed() > limits.max_duration {
-                break;
-            }
             let path = e.path().to_path_buf();
             let is_match = if e.file_type().is_dir() {
                 match_agent_dir(agent, &path)
