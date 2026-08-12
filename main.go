@@ -30,6 +30,8 @@ type app struct {
 	hoverX      int
 	hoverY      int
 	lastClick   time.Time
+	cfg         *config
+	scanning    bool
 }
 
 func makeIcon() (*walk.Icon, error) {
