@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestConfigRoundTrip(t *testing.T) {
@@ -109,5 +110,84 @@ func createTestDB(t *testing.T, path, ddl string) {
 	defer db.Close()
 	if _, err := db.Exec(ddl); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestKnownCandidatesCodexEnv(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("CODEX_HOME", dir)
+	got := knownCandidates(agentCodex)
+	if len(got) != 1 || got[0] != dir {
+		t.Fatalf("unexpected candidates: %v", got)
+	}
+}
+
+func TestDiscoverAgentPath(t *testing.T) {
+	root := t.TempDir()
+	// Isolate default-location candidates (e.g. the real ~/.claude/projects
+	// on this machine) so discovery must go through the scan roots.
+	t.Setenv("USERPROFILE", t.TempDir())
+
+	codex := filepath.Join(root, "ai-data", "codex")
+	if err := os.MkdirAll(filepath.Join(codex, "sessions"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(codex, "archived_sessions"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	claude := filepath.Join(root, ".claude", "projects")
+	if err := os.MkdirAll(filepath.Join(claude, "s1"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(claude, "s1", "a.jsonl"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	zdb := filepath.Join(root, "zdata", "db.sqlite")
+	if err := os.MkdirAll(filepath.Dir(zdb), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	createTestDB(t, zdb, `CREATE TABLE message (id TEXT, data TEXT)`)
+	odb := filepath.Join(root, "opencode.db")
+	createTestDB(t, odb, `CREATE TABLE session (id TEXT, tokens_input INTEGER)`)
+
+	roots := []string{root}
+	if got := discoverAgentPath(agentCodex, roots); got != codex {
+		t.Fatalf("codex: got %q want %q", got, codex)
+	}
+	if got := discoverAgentPath(agentClaude, roots); got != claude {
+		t.Fatalf("claude: got %q want %q", got, claude)
+	}
+	if got := discoverAgentPath(agentZcode, roots); got != zdb {
+		t.Fatalf("zcode: got %q want %q", got, zdb)
+	}
+	if got := discoverAgentPath(agentOpenCode, roots); got != odb {
+		t.Fatalf("opencode: got %q want %q", got, odb)
+	}
+}
+
+func TestDiscoverPrefersNewest(t *testing.T) {
+	root := t.TempDir()
+	old := filepath.Join(root, "old")
+	newd := filepath.Join(root, "new")
+	for _, d := range []string{old, newd} {
+		if err := os.MkdirAll(filepath.Join(d, "sessions"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(filepath.Join(d, "archived_sessions"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	oldT := time.Now().Add(-48 * time.Hour)
+	if err := os.Chtimes(old, oldT, oldT); err != nil {
+		t.Fatal(err)
+	}
+	newT := time.Now().Add(-1 * time.Hour)
+	if err := os.Chtimes(newd, newT, newT); err != nil {
+		t.Fatal(err)
+	}
+	if got := discoverAgentPath(agentCodex, []string{root}); got != newd {
+		t.Fatalf("expected newest %q, got %q", newd, got)
 	}
 }

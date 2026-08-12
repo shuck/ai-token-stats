@@ -3,8 +3,14 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+
+	"golang.org/x/sys/windows"
 )
 
 type agentPath struct {
@@ -135,4 +141,159 @@ func hasSessionTable(path string) bool {
 	var cols int
 	err = db.QueryRow(`SELECT count(*) FROM pragma_table_info('session') WHERE name='tokens_input'`).Scan(&cols)
 	return err == nil && cols > 0
+}
+
+const (
+	maxScanDepth    = 4
+	maxScanDirs     = 20000
+	maxScanDuration = 20 * time.Second
+)
+
+func knownCandidates(agent string) []string {
+	home := os.Getenv("USERPROFILE")
+	switch agent {
+	case agentCodex:
+		if h := os.Getenv("CODEX_HOME"); h != "" {
+			return []string{h}
+		}
+		if home != "" {
+			return []string{filepath.Join(home, ".codex")}
+		}
+	case agentZcode:
+		if d := os.Getenv("ZCODE_DATA"); d != "" {
+			return []string{filepath.Join(d, "cli", "db", "db.sqlite")}
+		}
+	case agentClaude:
+		if home != "" {
+			return []string{filepath.Join(home, ".claude", "projects")}
+		}
+	case agentOpenCode:
+		if home != "" {
+			return []string{filepath.Join(home, ".local", "share", "opencode", "opencode.db")}
+		}
+	}
+	return nil
+}
+
+func scanRoots() []string {
+	roots := map[string]bool{}
+	for _, d := range fixedDrives() {
+		roots[d] = true
+	}
+	for _, env := range []string{"USERPROFILE", "APPDATA", "LOCALAPPDATA"} {
+		if v := os.Getenv(env); v != "" {
+			roots[v] = true
+		}
+	}
+	out := make([]string, 0, len(roots))
+	for r := range roots {
+		out = append(out, r)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func fixedDrives() []string {
+	bits, err := windows.GetLogicalDrives()
+	if err != nil {
+		return nil
+	}
+	var drives []string
+	for i := 0; i < 26; i++ {
+		if bits&(1<<uint(i)) != 0 {
+			drives = append(drives, string(rune('A'+i))+":\\")
+		}
+	}
+	return drives
+}
+
+var skipDirs = map[string]bool{
+	"$Recycle.Bin":              true,
+	"$RECYCLE.BIN":              true,
+	"System Volume Information": true,
+	"Windows":                   true,
+	"Program Files":             true,
+	"Program Files (x86)":       true,
+}
+
+func discoverAgentPath(agent string, roots []string) string {
+	for _, p := range knownCandidates(agent) {
+		if validateAgentPath(agent, p) {
+			return p
+		}
+	}
+	best := ""
+	var bestMtime time.Time
+	deadline := time.Now().Add(maxScanDuration)
+	for _, root := range roots {
+		info, err := os.Stat(root)
+		if err != nil || !info.IsDir() {
+			continue
+		}
+		visited := 0
+		_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return filepath.SkipDir
+			}
+			if !d.IsDir() {
+				if matchAgentFile(agent, path) {
+					fi, e := d.Info()
+					if e == nil && (best == "" || fi.ModTime().After(bestMtime)) {
+						best = path
+						bestMtime = fi.ModTime()
+					}
+				}
+				return nil
+			}
+			visited++
+			if visited > maxScanDirs || time.Now().After(deadline) {
+				return filepath.SkipDir
+			}
+			rel, e := filepath.Rel(root, path)
+			if e != nil {
+				return filepath.SkipDir
+			}
+			if depth := len(strings.Split(rel, string(os.PathSeparator))); depth > maxScanDepth {
+				return filepath.SkipDir
+			}
+			if path != root && skipDirs[d.Name()] {
+				return filepath.SkipDir
+			}
+			if matchAgentDir(agent, path) {
+				fi, e := d.Info()
+				if e == nil && (best == "" || fi.ModTime().After(bestMtime)) {
+					best = path
+					bestMtime = fi.ModTime()
+				}
+			}
+			return nil
+		})
+	}
+	return best
+}
+
+func matchAgentFile(agent, path string) bool {
+	name := strings.ToLower(filepath.Base(path))
+	switch agent {
+	case agentZcode:
+		return name == "db.sqlite" && hasMessageTable(path)
+	case agentOpenCode:
+		return name == "opencode.db" && hasSessionTable(path)
+	}
+	return false
+}
+
+func matchAgentDir(agent, path string) bool {
+	switch agent {
+	case agentCodex:
+		if _, err := os.Stat(filepath.Join(path, "logs_2.sqlite")); err == nil {
+			return true
+		}
+		s1, e1 := os.Stat(filepath.Join(path, "sessions"))
+		s2, e2 := os.Stat(filepath.Join(path, "archived_sessions"))
+		return e1 == nil && s1.IsDir() && e2 == nil && s2.IsDir()
+	case agentClaude:
+		return isClaudeProjects(path)
+	}
+	return false
 }
