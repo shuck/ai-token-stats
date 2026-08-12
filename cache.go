@@ -208,19 +208,13 @@ func ensureCached(agent string) error {
 	}
 
 	if agent == agentAll || agent == agentZcode {
-		since := getWatermark(db, "zcode-ts")
-		records := loadZCodeRecords(since)
-		maxTs := since
-		for _, r := range records {
-			if r.Ts > maxTs {
-				maxTs = r.Ts
-			}
-		}
+		since := getWatermark(db, "zcode-updated-ts")
+		records, maxUpdated := loadZCodeRecords(zcodeDB(), since)
 		if err := insertRecords(db, agentZcode, records); err != nil {
 			return err
 		}
-		if maxTs > since {
-			if err := setWatermark(db, "zcode-ts", maxTs); err != nil {
+		if maxUpdated > since {
+			if err := setWatermark(db, "zcode-updated-ts", maxUpdated); err != nil {
 				return err
 			}
 		}

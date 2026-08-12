@@ -472,30 +472,34 @@ func loadLogFallback(withTokenCount map[string]bool, contextByThread map[string]
 	return records, maxTs
 }
 
-func loadZCodeRecords(since int64) []record {
-	if _, err := os.Stat(zcodeDB()); err != nil {
-		return nil
+func loadZCodeRecords(path string, since int64) ([]record, int64) {
+	if _, err := os.Stat(path); err != nil {
+		return nil, 0
 	}
-	db, err := sql.Open("sqlite", "file:"+zcodeDB()+"?mode=ro&_pragma=query_only(1)")
+	db, err := sql.Open("sqlite", "file:"+path+"?mode=ro&_pragma=query_only(1)")
 	if err != nil {
-		return nil
+		return nil, 0
 	}
 	defer db.Close()
 	rows, err := db.Query(
-		`SELECT id, time_created, data FROM message
-		  WHERE json_extract(data, '$.tokens') IS NOT NULL AND time_created > ?`, since)
+		`SELECT id, time_created, time_updated, data FROM message
+		  WHERE json_extract(data, '$.tokens') IS NOT NULL AND time_updated > ?`, since)
 	if err != nil {
-		return nil
+		return nil, 0
 	}
 	defer rows.Close()
 
 	records := []record{}
+	maxUpdated := since
 	for rows.Next() {
 		var id string
-		var ts int64
+		var created, updated int64
 		var raw string
-		if err := rows.Scan(&id, &ts, &raw); err != nil {
+		if err := rows.Scan(&id, &created, &updated, &raw); err != nil {
 			continue
+		}
+		if updated > maxUpdated {
+			maxUpdated = updated
 		}
 		var msg zcodeMessageJSON
 		if json.Unmarshal([]byte(raw), &msg) != nil {
@@ -514,8 +518,8 @@ func loadZCodeRecords(since int64) []record {
 			Model:    model,
 			Key:      id,
 			Path:     "zcode",
-			Ts:       ts,
-			Date:     dateKey(ts),
+			Ts:       created,
+			Date:     dateKey(created),
 			Usage: usage{
 				Input:      msg.Tokens.Input,
 				Cached:     msg.Tokens.Cache.Read,
@@ -527,7 +531,7 @@ func loadZCodeRecords(since int64) []record {
 			ContextWindow: nil,
 		})
 	}
-	return records
+	return records, maxUpdated
 }
 
 func loadCodexRecords(changed map[string]bool, logsSince int64) ([]record, int64) {
@@ -868,7 +872,8 @@ func collect(days int, agent string) report {
 		records = append(records, codexRecords...)
 	}
 	if agent == agentAll || agent == agentZcode {
-		records = append(records, loadZCodeRecords(0)...)
+		zcodeRecords, _ := loadZCodeRecords(zcodeDB(), 0)
+		records = append(records, zcodeRecords...)
 	}
 	if agent == agentAll || agent == agentClaude {
 		records = append(records, loadClaudeRecords(nil)...)
