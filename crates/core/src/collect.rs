@@ -57,7 +57,7 @@ fn records_for_agent(cfg: &Config, agent: Agent, cache: &mut Cache) -> Vec<Recor
             if let Some(p) = cfg.agents.get(&Agent::Claude) {
                 let root = PathBuf::from(&p.path);
                 let changed = cache
-                    .changed_file_paths("Claude", &[root.clone()])
+                    .changed_file_paths("Claude", std::slice::from_ref(&root))
                     .unwrap_or_default();
                 let records = load_claude_records(&[root], Some(&changed));
                 for p in &changed {
@@ -104,7 +104,7 @@ fn records_for_agent(cfg: &Config, agent: Agent, cache: &mut Cache) -> Vec<Recor
 
 pub fn collect(cache_path: &std::path::Path, cfg: &Config, days: usize, agent: &str) -> Report {
     let mut cache =
-        Cache::open(cache_path).unwrap_or_else(|_| Cache::open(&std::path::Path::new(":memory:")).unwrap());
+        Cache::open(cache_path).unwrap_or_else(|_| Cache::open(std::path::Path::new(":memory:")).unwrap());
     let mut records = Vec::new();
     let agents: Vec<Agent> = match agent {
         "Codex" => vec![Agent::Codex],

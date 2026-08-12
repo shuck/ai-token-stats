@@ -88,10 +88,8 @@ impl Cache {
                     r.get::<_, i64>(2)?,
                 ))
             })?;
-            for row in rows {
-                if let Ok((p, size, mtime)) = row {
-                    stored.insert(p, (size, mtime));
-                }
+            for (p, size, mtime) in rows.flatten() {
+                stored.insert(p, (size, mtime));
             }
         }
         let mut changed = BTreeSet::new();

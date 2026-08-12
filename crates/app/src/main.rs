@@ -1,6 +1,6 @@
 use ai_token_stats_core::collect::collect;
 use ai_token_stats_core::config::Config;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 mod bootstrap;
@@ -26,7 +26,7 @@ fn app_dir() -> PathBuf {
     fallback
 }
 
-fn writable(dir: &PathBuf) -> bool {
+fn writable(dir: &Path) -> bool {
     let probe = dir.join(format!(".write-test-{}", std::process::id()));
     match std::fs::write(&probe, b"") {
         Ok(_) => {

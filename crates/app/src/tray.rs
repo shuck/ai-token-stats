@@ -71,18 +71,19 @@ pub fn create_tray(ctx: Context) -> (Arc<TrayState>, TrayIcon) {
                 ctx.request_repaint();
             }
         }
-        if let Ok(event) = TrayIconEvent::receiver().try_recv() {
-            if let TrayIconEvent::Click { button, button_state, .. } = event {
-                if button == MouseButton::Left && button_state == MouseButtonState::Up {
-                    let now = std::time::Instant::now();
-                    let mut last = s.last_click.lock().unwrap();
-                    let dbl = last.elapsed().as_millis() <= DOUBLE_CLICK_MS;
-                    *last = now;
-                    if dbl {
-                        *s.pending_action.lock().unwrap() = Some(Action::Open);
-                        ctx.request_repaint();
-                    }
-                }
+        if let Ok(TrayIconEvent::Click {
+            button: MouseButton::Left,
+            button_state: MouseButtonState::Up,
+            ..
+        }) = TrayIconEvent::receiver().try_recv()
+        {
+            let now = std::time::Instant::now();
+            let mut last = s.last_click.lock().unwrap();
+            let dbl = last.elapsed().as_millis() <= DOUBLE_CLICK_MS;
+            *last = now;
+            if dbl {
+                *s.pending_action.lock().unwrap() = Some(Action::Open);
+                ctx.request_repaint();
             }
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
