@@ -5,4 +5,5 @@ pub mod config;
 pub mod discovery;
 pub mod opencode;
 pub mod report;
+pub mod types;
 pub mod zcode;
