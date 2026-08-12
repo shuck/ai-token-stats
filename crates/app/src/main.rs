@@ -128,12 +128,15 @@ fn main() {
             .with_icon(Arc::new(make_icon_data())),
         ..Default::default()
     };
-    let app = ui::App::new(dir, cfg);
+    let mut app = ui::App::new(dir, cfg);
     let _ = eframe::run_native(
         "AI Token 统计",
         options,
         Box::new(move |cc| {
             install_fonts(&cc.egui_ctx);
+            let (state, icon) = tray::create_tray(cc.egui_ctx.clone());
+            app.tray = Some(state);
+            app._tray_icon = Some(icon);
             Box::new(app)
         }),
     );

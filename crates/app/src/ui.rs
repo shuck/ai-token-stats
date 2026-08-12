@@ -2,6 +2,7 @@ use ai_token_stats_core::collect::collect;
 use ai_token_stats_core::config::Config;
 use ai_token_stats_core::report::Report;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 pub struct App {
@@ -12,6 +13,11 @@ pub struct App {
     pub agent: String,
     pub last_refresh: Option<Instant>,
     pub settings_open: bool,
+    pub tray: Option<Arc<crate::tray::TrayState>>,
+    pub _tray_icon: Option<tray_icon::TrayIcon>,
+    pub pending_show: bool,
+    pub pending_close: bool,
+    pub exiting: bool,
 }
 
 impl App {
@@ -24,9 +30,26 @@ impl App {
             agent: "all".to_string(),
             last_refresh: None,
             settings_open: false,
+            tray: None,
+            _tray_icon: None,
+            pending_show: false,
+            pending_close: false,
+            exiting: false,
         };
         app.refresh();
         app
+    }
+
+    pub fn ctx_send_visible(&mut self, visible: bool) {
+        if visible {
+            self.refresh();
+        }
+        self.pending_show = true;
+    }
+
+    pub fn ctx_send_close(&mut self) {
+        self.exiting = true;
+        self.pending_close = true;
     }
 
     pub fn refresh(&mut self) {
@@ -55,6 +78,20 @@ pub fn fmt_percent(v: Option<f64>) -> String {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if self.pending_show {
+            self.pending_show = false;
+            ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+            ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
+            ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+        }
+        if self.pending_close {
+            self.pending_close = false;
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
+        if ctx.input(|i| i.viewport().close_requested()) && !self.exiting {
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+        }
         if let Some(t) = self.last_refresh {
             if t.elapsed() >= Duration::from_secs(60) {
                 self.refresh();
