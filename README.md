@@ -27,16 +27,15 @@ Windows 桌面（系统托盘）工具，汇总本机 Codex、ZCode、Claude Cod
 
 ## 数据来源
 
-数据路径为源码中硬编码的本机路径，按 Agent 汇总：
+各 Agent 数据路径由程序自动发现：
 
-| Agent | 来源 |
-| --- | --- |
-| Codex | `D:\ai-data\codex\sessions` 和 `D:\ai-data\codex\archived_sessions` 下的 JSONL 会话文件，以及 `logs_2.sqlite`、`state_5.sqlite` |
-| ZCode | `D:\ai-data\zcode-data\cli\db\db.sqlite` |
-| Claude Code | `C:\Users\zc\.claude\projects` 下的 JSONL 会话文件 |
-| OpenCode | `C:\Users\zc\.local\share\opencode\opencode.db` |
+1. 环境变量：Codex 查 `CODEX_HOME`，ZCode 查 `ZCODE_DATA`。
+2. 默认位置：`~/.codex`、`~/.claude/projects`、`~/.local/share/opencode/opencode.db`。
+3. 受限目录扫描（深度 ≤ 4、限时限量）：按特征识别 Codex（`logs_2.sqlite` 或 `sessions`+`archived_sessions`）、ZCode（含 `message` 表的 `db.sqlite`）、Claude（`.claude\projects`）、OpenCode（含 `session` 表的 `opencode.db`）。
 
-首次运行时会在 `D:\ai-data\codex\codex-usage-tool\ai-token-stats-cache.db` 自动创建增量缓存数据库，之后只读取发生变化的文件。
+发现结果保存在 exe 同目录的 `config.json` 中。缓存的路径失效时，程序自动重新发现并更新；仍找不到时可通过托盘菜单「设置 Agent 路径…」手动指定。「重新扫描路径」可强制重扫全部 Agent。
+
+工具自身的增量缓存数据库（`ai-token-stats-cache.db`）与 `config.json` 一起放在 exe 同目录（exe 目录不可写时回退到 `%APPDATA%\ai-token-stats\`）。
 
 ## 使用
 
@@ -44,6 +43,7 @@ Windows 桌面（系统托盘）工具，汇总本机 Codex、ZCode、Claude Cod
 2. 双击托盘图标（或右键 → 打开面板）显示主窗口。
 3. 在主窗口切换时间范围、选择 Agent，点击「刷新」或等待每分钟自动刷新。
 4. 点击窗口关闭按钮只隐藏到托盘，通过托盘菜单「退出」结束程序。
+5. 右键托盘图标可选择「重新扫描路径」强制重扫，或「设置 Agent 路径…」手动指定各 Agent 数据源。
 
 ## 构建
 
@@ -73,6 +73,8 @@ ai-token-stats
 ├── collector.go   # 各 Agent 数据采集与汇总
 ├── cache.go       # SQLite 增量缓存
 ├── chart.go       # 图表绘制与提示框
+├── paths.go       # Agent 路径发现、配置读写
+├── settings.go    # Agent 路径设置对话框
 ├── app.manifest   # Windows 清单（Common Controls v6、DPI）
 ├── app.ico        # 应用图标
 ├── rsrc.syso      # 嵌入的图标/清单资源
@@ -81,5 +83,6 @@ ai-token-stats
 
 ## 说明
 
-- 各 Agent 的数据路径均为本机硬编码路径，换机器使用需修改 `collector.go` 顶部的常量。
+- 各 Agent 数据路径自动发现并缓存到 exe 同目录的 `config.json`，无需手动配置；路径失效会自动重扫更新。
+- 旧路径仍存在时程序会继续使用旧路径，此时可用托盘菜单「重新扫描路径」强制重扫。
 - 模型归属通过会话元数据或日志匹配得出，无法识别时记为 `unknown`。
