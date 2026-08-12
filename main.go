@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/lxn/walk"
+	"github.com/lxn/win"
 	"golang.org/x/sys/windows"
 )
 
@@ -154,8 +155,15 @@ func (a *app) showWindow() {
 	if a.mw == nil {
 		return
 	}
+	hwnd := a.mw.Handle()
+	if win.IsIconic(hwnd) {
+		win.ShowWindow(hwnd, win.SW_RESTORE)
+	}
 	a.mw.Show()
 	a.mw.SetVisible(true)
+	// Show/SetVisible do not raise Z-order or activate an already visible
+	// window, so bring it to the foreground explicitly.
+	win.SetForegroundWindow(hwnd)
 }
 
 func (a *app) run() error {
