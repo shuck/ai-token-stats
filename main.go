@@ -61,6 +61,7 @@ func acquireSingleInstance() (windows.Handle, bool, error) {
 }
 
 func (a *app) refresh() {
+	a.ensurePaths()
 	if a.agent == "" {
 		a.agent = agentAll
 	}
@@ -72,6 +73,62 @@ func (a *app) refresh() {
 	if a.ni != nil {
 		_ = a.ni.SetToolTip(fmt.Sprintf("AI Token 统计 | 今日 %s | 命中 %s", formatTokens(r.Today.Total), formatPercent(r.Today.HitRate)))
 	}
+}
+
+func (a *app) ensurePaths() {
+	needScan := false
+	for _, agent := range allAgents {
+		if !pathExists(agentPaths[agent]) {
+			needScan = true
+			break
+		}
+	}
+	if !needScan {
+		return
+	}
+	if a.smoke {
+		a.scanAll(false)
+		return
+	}
+	if a.scanning {
+		return
+	}
+	a.scanning = true
+	go func() {
+		defer func() { a.scanning = false }()
+		changed := a.scanAll(false)
+		if a.mw != nil {
+			a.mw.Synchronize(func() {
+				if changed && a.ni != nil {
+					_ = a.ni.ShowMessage("AI Token 统计", "Agent 数据路径已自动更新。")
+				}
+				a.refresh()
+			})
+		}
+	}()
+}
+
+func (a *app) scanAll(force bool) bool {
+	changed := false
+	roots := scanRoots()
+	for _, agent := range allAgents {
+		if !force && pathExists(agentPaths[agent]) {
+			continue
+		}
+		if p := discoverAgentPath(agent, roots); p != "" {
+			if p != agentPaths[agent] {
+				agentPaths[agent] = p
+				a.cfg.Agents[agent] = agentPath{Path: p, DetectedAt: time.Now().Format(time.RFC3339)}
+				changed = true
+			}
+		}
+	}
+	if changed {
+		if err := saveConfig(configPath, a.cfg); err != nil {
+			fmt.Fprintln(os.Stderr, "save config:", err)
+		}
+	}
+	return changed
 }
 
 func (a *app) showWindow() {
@@ -227,6 +284,33 @@ func (a *app) run() error {
 	refreshAction := walk.NewAction()
 	_ = refreshAction.SetText("刷新")
 	refreshAction.Triggered().Attach(a.refresh)
+	rescanAction := walk.NewAction()
+	_ = rescanAction.SetText("重新扫描路径")
+	rescanAction.Triggered().Attach(func() {
+		if a.scanning {
+			return
+		}
+		a.scanning = true
+		go func() {
+			defer func() { a.scanning = false }()
+			changed := a.scanAll(true)
+			if a.mw != nil {
+				a.mw.Synchronize(func() {
+					if a.ni != nil {
+						if changed {
+							_ = a.ni.ShowMessage("AI Token 统计", "Agent 数据路径已更新。")
+						} else {
+							_ = a.ni.ShowMessage("AI Token 统计", "未发现新的 Agent 数据路径。")
+						}
+					}
+					a.refresh()
+				})
+			}
+		}()
+	})
+	settingsAction := walk.NewAction()
+	_ = settingsAction.SetText("设置 Agent 路径…")
+	settingsAction.Triggered().Attach(func() { a.showSettingsDialog() })
 	exitAction := walk.NewAction()
 	_ = exitAction.SetText("退出")
 	exitAction.Triggered().Attach(func() {
@@ -239,6 +323,12 @@ func (a *app) run() error {
 		return err
 	}
 	if err := menu.Add(refreshAction); err != nil {
+		return err
+	}
+	if err := menu.Add(rescanAction); err != nil {
+		return err
+	}
+	if err := menu.Add(settingsAction); err != nil {
 		return err
 	}
 	if err := menu.Add(exitAction); err != nil {
@@ -330,8 +420,14 @@ func main() {
 	}
 	defer windows.CloseHandle(mutex)
 
+	cfg, err := initPaths()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
 	hold := false
-	a := &app{}
+	a := &app{cfg: cfg}
 	for _, arg := range os.Args[1:] {
 		if arg == "-smoke" {
 			a.smoke = true
