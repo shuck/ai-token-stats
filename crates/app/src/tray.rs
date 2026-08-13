@@ -48,8 +48,10 @@ pub fn create_tray(ctx: Context) -> (Arc<TrayState>, TrayIcon) {
     let rescan_id = rescan.id().clone();
     let settings_id = settings.id().clone();
     let exit_id = exit.id().clone();
+    crate::logging::log_msg("tray polling loop started");
     std::thread::spawn(move || loop {
         if let Ok(event) = tray_icon::menu::MenuEvent::receiver().try_recv() {
+            crate::logging::log_msg(&format!("menu event received: {:?}", event.id));
             let action = if event.id == open_id {
                 Some(Action::Open)
             } else if event.id == refresh_id {
@@ -69,14 +71,20 @@ pub fn create_tray(ctx: Context) -> (Arc<TrayState>, TrayIcon) {
             }
         }
         if let Ok(TrayIconEvent::Click {
-            button: MouseButton::Left,
+            button,
+            button_state,
             ..
         }) = TrayIconEvent::receiver().try_recv()
         {
-            // tray-icon 在 Windows 上不处理 WM_LBUTTONDBLCLK，
-            // 双击事件时序不可靠；改为任意左键点击即打开面板（双击同样生效）。
-            *s.pending_action.lock().unwrap() = Some(Action::Open);
-            ctx.request_repaint();
+            crate::logging::log_msg(&format!(
+                "tray click event: button={button:?} state={button_state:?}"
+            ));
+            if button == MouseButton::Left {
+                // tray-icon 在 Windows 上不处理 WM_LBUTTONDBLCLK，
+                // 双击事件时序不可靠；改为任意左键点击即打开面板（双击同样生效）。
+                *s.pending_action.lock().unwrap() = Some(Action::Open);
+                ctx.request_repaint();
+            }
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
     });

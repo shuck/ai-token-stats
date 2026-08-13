@@ -234,6 +234,14 @@ impl eframe::App for App {
                             if ui.button("刷新").clicked() {
                                 self.refresh();
                             }
+                            ui.add_space(4.0);
+                            if ui
+                                .button("退出")
+                                .on_hover_text("退出程序（不依赖托盘）")
+                                .clicked()
+                            {
+                                self.ctx_send_close();
+                            }
                         });
                     });
                 ui.add_space(10.0);
