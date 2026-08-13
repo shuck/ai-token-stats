@@ -54,6 +54,24 @@ pub fn draw_chart(ui: &mut egui::Ui, rep: &Report, agent: &str) {
         egui::pos2(rect.left() + 24.0, title_bottom),
         egui::pos2(rect.right() - 24.0, legend_top - 8.0),
     );
+    // 绘图面板背景与浅色网格
+    painter.rect_filled(
+        plot.expand2(egui::vec2(6.0, 6.0)),
+        8.0,
+        egui::Color32::from_rgb(250, 252, 255),
+    );
+    painter.rect_stroke(
+        plot.expand2(egui::vec2(6.0, 6.0)),
+        8.0,
+        egui::Stroke::new(1.0_f32, egui::Color32::from_rgb(210, 224, 240)),
+    );
+    for k in 0..=4 {
+        let y = plot.top() + plot.height() * k as f32 / 4.0;
+        painter.line_segment(
+            [egui::pos2(plot.left(), y), egui::pos2(plot.right(), y)],
+            egui::Stroke::new(1.0_f32, egui::Color32::from_rgb(228, 234, 242)),
+        );
+    }
     painter.text(
         egui::pos2(rect.center().x, rect.top() + 6.0),
         egui::Align2::CENTER_TOP,
@@ -73,11 +91,25 @@ pub fn draw_chart(ui: &mut egui::Ui, rep: &Report, agent: &str) {
     let bar_w = (slot * 0.55).max(1.0);
 
     let mut hover_day: Option<&DaySummary> = None;
+    let mut hover_idx: Option<usize> = None;
     if let Some(pos) = response.hover_pos() {
         let idx = ((pos.x - plot.left()) / slot).floor() as usize;
         if idx < rep.daily.len() && pos.x >= plot.left() && pos.x <= plot.right() {
             hover_day = Some(&rep.daily[idx]);
+            hover_idx = Some(idx);
         }
+    }
+
+    if let Some(idx) = hover_idx {
+        let x0 = plot.left() + idx as f32 * slot;
+        painter.rect_stroke(
+            egui::Rect::from_min_max(
+                egui::pos2(x0, plot.top()),
+                egui::pos2(x0 + slot, plot.bottom()),
+            ),
+            4.0,
+            egui::Stroke::new(1.5_f32, egui::Color32::from_rgb(255, 140, 0)),
+        );
     }
 
     for (i, day) in rep.daily.iter().enumerate() {

@@ -93,6 +93,18 @@ fn install_fonts(ctx: &egui::Context) {
         }
     }
     ctx.set_fonts(fonts);
+    ctx.style_mut(|s| {
+        s.spacing.item_spacing = egui::vec2(10.0, 8.0);
+        s.spacing.button_padding = egui::vec2(10.0, 5.0);
+        for w in [
+            &mut s.visuals.widgets.inactive,
+            &mut s.visuals.widgets.hovered,
+            &mut s.visuals.widgets.active,
+        ] {
+            w.rounding = egui::Rounding::same(4.0);
+        }
+        s.visuals.selection.bg_fill = egui::Color32::from_rgb(20, 90, 220);
+    });
 }
 
 fn main() {

@@ -70,6 +70,14 @@ impl App {
         ));
         self.report = Some(collect(&cache_path, &self.cfg, self.days, &self.agent));
         if let Some(rep) = &self.report {
+            if let Some(icon) = &self._tray_icon {
+                let tip = format!(
+                    "AI Token 统计 | 今日 {} | 命中 {}",
+                    fmt_tokens(rep.today.total),
+                    fmt_percent(rep.today.hit_rate)
+                );
+                let _ = icon.set_tooltip(Some(tip));
+            }
             crate::logging::log_msg(&format!(
                 "refresh done turns={} agents={:?} models={:?} zcode={} codex={} claude={} opencode={}",
                 rep.totals.turns,
@@ -241,17 +249,23 @@ impl eframe::App for App {
                                     egui::Color32::from_rgb(210, 224, 240),
                                 ))
                                 .rounding(egui::Rounding::same(8.0))
-                                .inner_margin(egui::Margin::same(10.0))
+                                .inner_margin(egui::Margin::same(12.0))
+                                .shadow(egui::epaint::Shadow {
+                                    offset: egui::vec2(0.0, 1.0),
+                                    blur: 8.0,
+                                    spread: 0.0,
+                                    color: egui::Color32::from_black_alpha(18),
+                                })
                                 .show(ui, |ui| {
-                                    ui.set_min_size(egui::vec2(150.0, 54.0));
+                                    ui.set_min_size(egui::vec2(152.0, 60.0));
                                     ui.label(
                                         egui::RichText::new(title)
-                                            .size(12.0)
+                                            .size(12.5)
                                             .color(egui::Color32::from_rgb(90, 100, 115)),
                                     );
                                     ui.label(
                                         egui::RichText::new(value)
-                                            .size(18.0)
+                                            .size(20.0)
                                             .strong()
                                             .color(egui::Color32::from_rgb(20, 90, 220)),
                                     );
