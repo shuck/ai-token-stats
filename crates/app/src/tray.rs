@@ -32,6 +32,7 @@ pub fn create_tray(ctx: Context) -> (Arc<TrayState>, TrayIcon) {
     let icon = Icon::from_rgba(rgba, 32, 32).expect("icon");
     let tray = TrayIconBuilder::new()
         .with_menu(Box::new(menu))
+        .with_menu_on_left_click(false)
         .with_tooltip("AI Token 统计")
         .with_icon(icon)
         .build()

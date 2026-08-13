@@ -50,6 +50,12 @@ impl App {
     pub fn ctx_send_close(&mut self) {
         self.exiting = true;
         self.pending_close = true;
+        // 兜底：eframe/winit 关窗链路若被卡住，1.5 秒后强制退出，
+        // 保证托盘「退出」永远可用。
+        std::thread::spawn(|| {
+            std::thread::sleep(Duration::from_secs(1) + Duration::from_millis(500));
+            std::process::exit(0);
+        });
     }
 
     pub fn refresh(&mut self) {
@@ -219,6 +225,15 @@ impl eframe::App for App {
                     });
                     ui.add_space(8.0);
                     crate::chart::draw_chart(ui, rep, &self.agent);
+                } else {
+                    ui.add_space(40.0);
+                    ui.centered_and_justified(|ui| {
+                        ui.label(
+                            egui::RichText::new("无数据")
+                                .size(18.0)
+                                .color(egui::Color32::from_rgb(120, 120, 120)),
+                        );
+                    });
                 }
             });
 

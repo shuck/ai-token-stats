@@ -121,6 +121,10 @@ fn main() {
         }
         return;
     }
+    if args.iter().any(|a| a == "-hold") {
+        std::thread::sleep(std::time::Duration::from_secs(5));
+        return;
+    }
     if !single_instance() {
         return;
     }

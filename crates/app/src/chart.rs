@@ -166,19 +166,30 @@ pub fn draw_chart(ui: &mut egui::Ui, rep: &Report, agent: &str) {
                     pct(day.max_usage_percent),
                     pct(day.hit_rate)
                 ));
-                let subs: Vec<(&String, &DaySummary)> = if by_agent {
-                    day.by_agent
-                        .iter()
-                        .filter(|(_, s)| s.total > 0)
-                        .collect()
+                // 与 Go 版一致：按 Agent 列出总额，其下缩进列出各模型
+                if by_agent {
+                    for agent in &rep.agents {
+                        if let Some(ad) = day.by_agent.get(agent) {
+                            if ad.total > 0 {
+                                ui.label(format!("{agent}：{}", fmt(ad.total)));
+                                for model in &rep.models {
+                                    if let Some(md) = ad.by_model.get(model) {
+                                        if md.total > 0 {
+                                            ui.label(format!("  {model}：{}", fmt(md.total)));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 } else {
-                    day.by_model
-                        .iter()
-                        .filter(|(_, s)| s.total > 0)
-                        .collect()
-                };
-                for (k, s) in subs {
-                    ui.label(format!("{k}：{}", fmt(s.total)));
+                    for model in &rep.models {
+                        if let Some(md) = day.by_model.get(model) {
+                            if md.total > 0 {
+                                ui.label(format!("{model}：{}", fmt(md.total)));
+                            }
+                        }
+                    }
                 }
         });
     }
