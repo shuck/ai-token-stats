@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 mod bootstrap;
 mod chart;
+mod logging;
 mod settings;
 mod tray;
 mod ui;
@@ -97,11 +98,21 @@ fn install_fonts(ctx: &egui::Context) {
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let dir = app_dir();
+    logging::init(&dir);
+    logging::log_msg(&format!(
+        "startup args={args:?} app_dir={}",
+        dir.to_string_lossy()
+    ));
     let cfg = Config::load(&dir.join("config.json")).unwrap_or_default();
     if args.iter().any(|a| a == "-smoke") {
         let mut cfg = cfg;
         bootstrap::ensure_discovered(&mut cfg, &dir.join("config.json"));
+        logging::log_msg(&format!("smoke config={cfg:?}"));
         let rep = collect(&dir.join("ai-token-stats-cache.db"), &cfg, 30, "all");
+        logging::log_msg(&format!(
+            "smoke result turns={} agents={:?} models={:?}",
+            rep.totals.turns, rep.agents, rep.models
+        ));
         println!(
             "SMOKE OK: days={} turns={} agents={:?} models={:?}",
             rep.days, rep.totals.turns, rep.agents, rep.models
@@ -126,6 +137,7 @@ fn main() {
         return;
     }
     if !single_instance() {
+        logging::log_msg("single instance already running, exiting");
         return;
     }
     let options = eframe::NativeOptions {

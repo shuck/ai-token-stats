@@ -106,17 +106,30 @@ pub fn poll_events(app: &mut App) {
     if let Some(state) = app.tray.as_ref() {
         let action = state.pending_action.lock().unwrap().take();
         match action {
-            Some(Action::Open) => app.ctx_send_visible(true),
-            Some(Action::Refresh) => app.refresh(),
+            Some(Action::Open) => {
+                crate::logging::log_msg("tray action: open");
+                app.ctx_send_visible(true);
+            }
+            Some(Action::Refresh) => {
+                crate::logging::log_msg("tray action: refresh");
+                app.refresh();
+            }
             Some(Action::Rescan) => {
+                crate::logging::log_msg("tray action: rescan");
                 crate::bootstrap::ensure_discovered_force(
                     &mut app.cfg,
                     &app.dir.join("config.json"),
                 );
                 app.refresh();
             }
-            Some(Action::Settings) => app.settings_open = true,
-            Some(Action::Exit) => app.ctx_send_close(),
+            Some(Action::Settings) => {
+                crate::logging::log_msg("tray action: settings");
+                app.settings_open = true;
+            }
+            Some(Action::Exit) => {
+                crate::logging::log_msg("tray action: exit");
+                app.ctx_send_close();
+            }
             None => {}
         }
     }

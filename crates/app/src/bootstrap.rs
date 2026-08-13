@@ -5,9 +5,15 @@ use ai_token_stats_core::discovery::{
 use std::path::Path;
 
 pub fn ensure_discovered(cfg: &mut Config, config_path: &Path) {
+    crate::logging::log_msg(&format!("ensure_discovered before cfg={cfg:?}"));
     let changed = discover_missing(cfg);
+    crate::logging::log_msg(&format!(
+        "ensure_discovered after cfg={cfg:?} changed={changed}"
+    ));
     if changed {
-        cfg.save(config_path).ok();
+        if let Err(e) = cfg.save(config_path) {
+            crate::logging::log_msg(&format!("config save failed: {e}"));
+        }
     }
 }
 
@@ -28,7 +34,9 @@ pub fn ensure_discovered_force(cfg: &mut Config, config_path: &Path) {
         }
     }
     if changed {
-        cfg.save(config_path).ok();
+        if let Err(e) = cfg.save(config_path) {
+            crate::logging::log_msg(&format!("force rescan config save failed: {e}"));
+        }
     }
 }
 

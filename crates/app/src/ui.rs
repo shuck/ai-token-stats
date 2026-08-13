@@ -22,6 +22,8 @@ pub struct App {
 
 impl App {
     pub fn new(dir: PathBuf, cfg: Config) -> Self {
+        let mut cfg = cfg;
+        crate::bootstrap::ensure_discovered(&mut cfg, &dir.join("config.json"));
         let mut app = App {
             dir,
             cfg,
@@ -61,7 +63,40 @@ impl App {
     pub fn refresh(&mut self) {
         self.last_refresh = Some(Instant::now());
         let cache_path = self.dir.join("ai-token-stats-cache.db");
+        crate::bootstrap::ensure_discovered(&mut self.cfg, &self.dir.join("config.json"));
+        crate::logging::log_msg(&format!(
+            "refresh days={} agent={} cfg={:?}",
+            self.days, self.agent, self.cfg
+        ));
         self.report = Some(collect(&cache_path, &self.cfg, self.days, &self.agent));
+        if let Some(rep) = &self.report {
+            crate::logging::log_msg(&format!(
+                "refresh done turns={} agents={:?} models={:?} zcode={} codex={} claude={} opencode={}",
+                rep.totals.turns,
+                rep.agents,
+                rep.models,
+                rep.totals
+                    .by_agent
+                    .get("ZCode")
+                    .map(|s| s.total)
+                    .unwrap_or(0),
+                rep.totals
+                    .by_agent
+                    .get("Codex")
+                    .map(|s| s.total)
+                    .unwrap_or(0),
+                rep.totals
+                    .by_agent
+                    .get("Claude")
+                    .map(|s| s.total)
+                    .unwrap_or(0),
+                rep.totals
+                    .by_agent
+                    .get("OpenCode")
+                    .map(|s| s.total)
+                    .unwrap_or(0),
+            ));
+        }
     }
 }
 
