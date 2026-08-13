@@ -186,11 +186,12 @@ pub fn discover_agent_path(
         }
     }
     let mut best: Option<(PathBuf, i64)> = None;
-    let started = Instant::now();
     for root in roots {
         if !root.is_dir() {
             continue;
         }
+        // 每根独立计时（规格：每根 20 秒），避免前序大目录耗尽总预算
+        let started = Instant::now();
         let mut visited = 0usize;
         // Go 版语义：目录下降深度 > max_depth 时不再深入，但深度恰为 max_depth
         // 的目录内的文件仍会被访问；目录数/时间超限时跳过当前子树而不是中断整盘。
