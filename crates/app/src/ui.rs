@@ -76,6 +76,10 @@ pub fn fmt_percent(v: Option<f64>) -> String {
     }
 }
 
+fn lerp_u8(a: u8, b: u8, t: f32) -> u8 {
+    (a as f32 + (b as f32 - a as f32) * t) as u8
+}
+
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if self.pending_show {
@@ -101,41 +105,90 @@ impl eframe::App for App {
         crate::tray::poll_events(self);
 
         egui::CentralPanel::default()
-            .frame(egui::Frame::default().fill(egui::Color32::from_rgb(232, 242, 252)))
+            .frame(egui::Frame::default().fill(egui::Color32::WHITE))
             .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label("最近天数:");
-                    let mut days = self.days.to_string();
-                    egui::ComboBox::from_id_source("days")
-                        .selected_text(days.clone())
-                        .show_ui(ui, |ui| {
-                            for d in ["7", "14", "30", "90"] {
-                                ui.selectable_value(&mut days, d.to_string(), d);
-                            }
-                        });
-                    if let Ok(v) = days.parse::<usize>() {
-                        self.days = v;
-                    }
-                    ui.label("Agent:");
-                    let agents = ["all", "Codex", "ZCode", "Claude", "OpenCode"];
-                    let mut cur = self.agent.clone();
-                    egui::ComboBox::from_id_source("agent")
-                        .selected_text(if self.agent == "all" {
-                            "全部".to_string()
-                        } else {
-                            self.agent.clone()
-                        })
-                        .show_ui(ui, |ui| {
-                            for a in agents {
-                                let label = if a == "all" { "全部" } else { a };
-                                ui.selectable_value(&mut cur, a.to_string(), label);
-                            }
-                        });
-                    self.agent = cur;
-                    if ui.button("刷新").clicked() {
-                        self.refresh();
-                    }
+                // 垂直渐变背景（浅蓝 → 白）
+                let rect = ui.max_rect();
+                let top_c = egui::Color32::from_rgb(232, 242, 252);
+                let bottom_c = egui::Color32::WHITE;
+                let bands = 24;
+                for i in 0..bands {
+                    let t = i as f32 / bands as f32;
+                    let t1 = (i + 1) as f32 / bands as f32;
+                    let c = egui::Color32::from_rgb(
+                        lerp_u8(top_c.r(), bottom_c.r(), t),
+                        lerp_u8(top_c.g(), bottom_c.g(), t),
+                        lerp_u8(top_c.b(), bottom_c.b(), t),
+                    );
+                    let y0 = rect.top() + rect.height() * t;
+                    let y1 = rect.top() + rect.height() * t1;
+                    ui.painter().rect_filled(
+                        egui::Rect::from_min_max(
+                            egui::pos2(rect.left(), y0),
+                            egui::pos2(rect.right(), y1),
+                        ),
+                        0.0,
+                        c,
+                    );
+                }
+
+                ui.add_space(10.0);
+                ui.vertical_centered(|ui| {
+                    ui.label(
+                        egui::RichText::new("AI Token 统计")
+                            .size(22.0)
+                            .strong()
+                            .color(egui::Color32::from_rgb(30, 30, 30)),
+                    );
                 });
+                ui.add_space(8.0);
+
+                egui::Frame::none()
+                    .fill(egui::Color32::from_rgb(250, 252, 255))
+                    .stroke(egui::Stroke::new(
+                        1.0_f32,
+                        egui::Color32::from_rgb(210, 224, 240),
+                    ))
+                    .rounding(egui::Rounding::same(8.0))
+                    .inner_margin(egui::Margin::same(10.0))
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("最近天数:");
+                            let mut days = self.days.to_string();
+                            egui::ComboBox::from_id_source("days")
+                                .selected_text(days.clone())
+                                .show_ui(ui, |ui| {
+                                    for d in ["7", "14", "30", "90"] {
+                                        ui.selectable_value(&mut days, d.to_string(), d);
+                                    }
+                                });
+                            if let Ok(v) = days.parse::<usize>() {
+                                self.days = v;
+                            }
+                            ui.add_space(12.0);
+                            ui.label("Agent:");
+                            let agents = ["all", "Codex", "ZCode", "Claude", "OpenCode"];
+                            let mut cur = self.agent.clone();
+                            egui::ComboBox::from_id_source("agent")
+                                .selected_text(if self.agent == "all" {
+                                    "全部".to_string()
+                                } else {
+                                    self.agent.clone()
+                                })
+                                .show_ui(ui, |ui| {
+                                    for a in agents {
+                                        let label = if a == "all" { "全部" } else { a };
+                                        ui.selectable_value(&mut cur, a.to_string(), label);
+                                    }
+                                });
+                            self.agent = cur;
+                            ui.add_space(12.0);
+                            if ui.button("刷新").clicked() {
+                                self.refresh();
+                            }
+                        });
+                    });
+                ui.add_space(10.0);
 
                 if let Some(rep) = &self.report {
                     ui.horizontal_wrapped(|ui| {
@@ -150,16 +203,28 @@ impl eframe::App for App {
                             ),
                         ];
                         for (title, value) in cards {
-                            egui::Frame::group(ui.style()).show(ui, |ui| {
-                                ui.set_min_size(egui::vec2(150.0, 54.0));
-                                ui.label(title);
-                                ui.label(
-                                    egui::RichText::new(value)
-                                        .size(16.0)
-                                        .strong()
-                                        .color(egui::Color32::from_rgb(20, 90, 220)),
-                                );
-                            });
+                            egui::Frame::none()
+                                .fill(egui::Color32::from_rgb(250, 252, 255))
+                                .stroke(egui::Stroke::new(
+                                    1.0_f32,
+                                    egui::Color32::from_rgb(210, 224, 240),
+                                ))
+                                .rounding(egui::Rounding::same(8.0))
+                                .inner_margin(egui::Margin::same(10.0))
+                                .show(ui, |ui| {
+                                    ui.set_min_size(egui::vec2(150.0, 54.0));
+                                    ui.label(
+                                        egui::RichText::new(title)
+                                            .size(12.0)
+                                            .color(egui::Color32::from_rgb(90, 100, 115)),
+                                    );
+                                    ui.label(
+                                        egui::RichText::new(value)
+                                            .size(18.0)
+                                            .strong()
+                                            .color(egui::Color32::from_rgb(20, 90, 220)),
+                                    );
+                                });
                         }
                     });
                     ui.add_space(8.0);

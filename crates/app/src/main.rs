@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 use ai_token_stats_core::collect::collect;
 use ai_token_stats_core::config::Config;
 use std::path::{Path, PathBuf};
