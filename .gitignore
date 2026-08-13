@@ -1,9 +1,5 @@
 # Runtime state, regenerated per machine
-ai-token-stats.exe
 config.json
 ai-token-stats-cache.db
-ai-token-stats.log
 config.json.corrupt-*
-
-# Rust
-target/
+codex-usage.exe
