@@ -79,3 +79,36 @@ func TestLoadZCodeRecordsUpdated(t *testing.T) {
 		t.Fatalf("expected no records past watermark, got %d", len(records))
 	}
 }
+
+func TestAddRecordHitRates(t *testing.T) {
+	day := newDaySummary("2026-08-12")
+	addRecord(&day, record{
+		Agent: "ZCode",
+		Model: "gpt-4o",
+		Date:  "2026-08-12",
+		Usage: usage{Input: 100, Cached: 40, Total: 100},
+	})
+	addRecord(&day, record{
+		Agent: "ZCode",
+		Model: "gpt-4o",
+		Date:  "2026-08-12",
+		Usage: usage{Input: 50, Cached: 10, Total: 50},
+	})
+	if day.HitRate == nil {
+		t.Fatal("day hit rate should be set")
+	}
+	if day.ByAgent["ZCode"] == nil || day.ByAgent["ZCode"].HitRate == nil {
+		t.Fatal("agent hit rate should be set")
+	}
+	if day.ByModel["gpt-4o"] == nil || day.ByModel["gpt-4o"].HitRate == nil {
+		t.Fatal("model hit rate should be set")
+	}
+	am := day.ByAgent["ZCode"].ByModel["gpt-4o"]
+	if am == nil || am.HitRate == nil {
+		t.Fatal("agent-model hit rate should be set")
+	}
+	want := 50.0 / 150.0 // (40+10)/(100+50)
+	if *am.HitRate != want {
+		t.Fatalf("expected hit rate %v, got %v", want, *am.HitRate)
+	}
+}

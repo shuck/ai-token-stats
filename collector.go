@@ -773,6 +773,10 @@ func addRecord(d *daySummary, r record) {
 	am.Reasoning += r.Usage.Reasoning
 	am.Total += r.Usage.Total
 	am.Turns++
+	if am.Input > 0 {
+		rate := float64(am.Cached) / float64(am.Input)
+		am.HitRate = &rate
+	}
 	if ad.Input > 0 {
 		rate := float64(ad.Cached) / float64(ad.Input)
 		ad.HitRate = &rate
