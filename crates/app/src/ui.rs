@@ -192,48 +192,49 @@ impl eframe::App for App {
 
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                            ui.label("最近天数:");
-                            let mut days = self.days.to_string();
-                            egui::ComboBox::from_id_source("days")
-                                .selected_text(days.clone())
-                                .show_ui(ui, |ui| {
-                                    for d in ["7", "14", "30", "90"] {
-                                        ui.selectable_value(&mut days, d.to_string(), d);
-                                    }
-                                });
-                            if let Ok(v) = days.parse::<usize>() {
-                                self.days = v;
-                            }
-                            ui.add_space(12.0);
-                            ui.label("Agent:");
-                            let agents = ["all", "Codex", "ZCode", "Claude", "OpenCode"];
-                            let mut cur = self.agent.clone();
-                            egui::ComboBox::from_id_source("agent")
-                                .selected_text(if self.agent == "all" {
-                                    "全部".to_string()
-                                } else {
-                                    self.agent.clone()
-                                })
-                                .show_ui(ui, |ui| {
-                                    for a in agents {
-                                        let label = if a == "all" { "全部" } else { a };
-                                        ui.selectable_value(&mut cur, a.to_string(), label);
-                                    }
-                                });
-                            self.agent = cur;
-                            ui.add_space(12.0);
-                            if ui.button("刷新").clicked() {
-                                self.refresh();
-                            }
-                            ui.add_space(4.0);
-                            if ui
-                                .button("退出")
-                                .on_hover_text("退出程序（不依赖托盘）")
-                                .clicked()
-                            {
-                                self.ctx_send_close();
-                            }
-                        });
+                    ui.add_space(12.0);
+                    crate::widgets::label(ui, "最近天数:");
+                    let day_items = ["7", "14", "30", "90"];
+                    let mut day_idx = day_items
+                        .iter()
+                        .position(|d| d.parse::<usize>().ok() == Some(self.days))
+                        .unwrap_or(2);
+                    crate::widgets::combo(ui, "days", day_items[day_idx], &day_items, &mut day_idx);
+                    self.days = day_items[day_idx].parse().unwrap_or(30);
+                    ui.add_space(12.0);
+                    crate::widgets::label(ui, "Agent:");
+                    let agent_items = ["全部", "Codex", "ZCode", "Claude", "OpenCode"];
+                    let mut agent_idx = match self.agent.as_str() {
+                        "Codex" => 1,
+                        "ZCode" => 2,
+                        "Claude" => 3,
+                        "OpenCode" => 4,
+                        _ => 0,
+                    };
+                    crate::widgets::combo(
+                        ui,
+                        "agent",
+                        agent_items[agent_idx],
+                        &agent_items,
+                        &mut agent_idx,
+                    );
+                    self.agent = match agent_idx {
+                        1 => "Codex",
+                        2 => "ZCode",
+                        3 => "Claude",
+                        4 => "OpenCode",
+                        _ => "all",
+                    }
+                    .to_string();
+                    ui.add_space(12.0);
+                    if crate::widgets::button(ui, "刷新") {
+                        self.refresh();
+                    }
+                    ui.add_space(6.0);
+                    if crate::widgets::button(ui, "退出") {
+                        self.ctx_send_close();
+                    }
+                });
                 ui.add_space(10.0);
 
                 if let Some(rep) = &self.report {

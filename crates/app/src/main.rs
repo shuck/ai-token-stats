@@ -11,6 +11,7 @@ mod logging;
 mod settings;
 mod tray;
 mod ui;
+mod widgets;
 
 fn app_dir() -> PathBuf {
     if let Some(dir) = std::env::current_exe()
