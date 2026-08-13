@@ -349,10 +349,10 @@ func (a *app) paintChart(canvas *walk.Canvas, bounds walk.Rectangle) error {
 		if stackByAgent {
 			for _, agent := range a.data.Agents {
 				if ad := day.ByAgent[agent]; ad != nil && ad.Total > 0 {
-					lines = append(lines, fmt.Sprintf("%s：%s", agent, formatTokens(ad.Total)))
+					lines = append(lines, fmt.Sprintf("%s：%s（命中率 %s）", agent, formatTokens(ad.Total), formatPercent(ad.HitRate)))
 					for _, model := range a.data.Models {
 						if md := ad.ByModel[model]; md != nil && md.Total > 0 {
-							lines = append(lines, fmt.Sprintf("  %s：%s", model, formatTokens(md.Total)))
+							lines = append(lines, fmt.Sprintf("  %s：%s（命中率 %s）", model, formatTokens(md.Total), formatPercent(md.HitRate)))
 						}
 					}
 				}
@@ -360,7 +360,7 @@ func (a *app) paintChart(canvas *walk.Canvas, bounds walk.Rectangle) error {
 		} else {
 			for _, model := range a.data.Models {
 				if md := day.ByModel[model]; md != nil && md.Total > 0 {
-					lines = append(lines, fmt.Sprintf("%s：%s", model, formatTokens(md.Total)))
+					lines = append(lines, fmt.Sprintf("%s：%s（命中率 %s）", model, formatTokens(md.Total), formatPercent(md.HitRate)))
 				}
 			}
 		}
