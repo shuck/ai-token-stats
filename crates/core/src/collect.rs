@@ -27,7 +27,8 @@ fn records_for_agent(cfg: &Config, agent: Agent, cache: &mut Cache) -> Vec<Recor
                 let changed = cache
                     .changed_file_paths("Codex", &[sessions.clone(), archived.clone()])
                     .unwrap_or_default();
-                let mut records = load_codex_records(&[sessions, archived], Some(&changed));
+                let (mut records, skip_threads) =
+                    load_codex_records(&[sessions, archived], Some(&changed));
                 let thread_models = crate::codex::load_thread_models(&state_db);
                 let log_models = crate::codex::load_log_models(&logs_db);
                 for r in &mut records {
@@ -39,7 +40,8 @@ fn records_for_agent(cfg: &Config, agent: Agent, cache: &mut Cache) -> Vec<Recor
                         }
                     }
                 }
-                let (log_records, max_ts) = crate::codex::load_log_fallback(&logs_db, &state_db, logs_since);
+                let (log_records, max_ts) =
+                    crate::codex::load_log_fallback(&logs_db, &state_db, &skip_threads, logs_since);
                 records.extend(log_records);
                 for p in &changed {
                     cache.delete_records_by_path("Codex", p).ok();

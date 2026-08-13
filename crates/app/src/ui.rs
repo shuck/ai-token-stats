@@ -132,17 +132,7 @@ impl eframe::App for App {
                     );
                 }
 
-                ui.add_space(10.0);
-                ui.vertical_centered(|ui| {
-                    ui.label(
-                        egui::RichText::new("AI Token 统计")
-                            .size(22.0)
-                            .strong()
-                            .color(egui::Color32::from_rgb(30, 30, 30)),
-                    );
-                });
                 ui.add_space(8.0);
-
                 egui::Frame::none()
                     .fill(egui::Color32::from_rgb(250, 252, 255))
                     .stroke(egui::Stroke::new(

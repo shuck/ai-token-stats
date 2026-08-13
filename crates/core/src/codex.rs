@@ -38,7 +38,7 @@ pub struct TokenCountInfo {
 pub fn load_codex_records(
     sessions: &[PathBuf],
     changed: Option<&BTreeSet<PathBuf>>,
-) -> Vec<Record> {
+) -> (Vec<Record>, BTreeSet<String>) {
     let files: Vec<PathBuf> = match changed {
         None => walk_jsonl(sessions),
         Some(set) if set.is_empty() => Vec::new(),
@@ -53,10 +53,11 @@ pub fn load_codex_records(
             .collect(),
     };
     let mut records = Vec::new();
+    let mut with_token_count: BTreeSet<String> = BTreeSet::new();
     for f in files {
-        parse_rollout_file(&f, &mut records);
+        parse_rollout_file(&f, &mut records, &mut with_token_count);
     }
-    records
+    (records, with_token_count)
 }
 
 fn walk_jsonl(roots: &[PathBuf]) -> Vec<PathBuf> {
@@ -80,7 +81,11 @@ fn walk_jsonl(roots: &[PathBuf]) -> Vec<PathBuf> {
     out
 }
 
-fn parse_rollout_file(path: &Path, records: &mut Vec<Record>) {
+fn parse_rollout_file(
+    path: &Path,
+    records: &mut Vec<Record>,
+    with_token_count: &mut BTreeSet<String>,
+) {
     let Ok(f) = fs::File::open(path) else { return };
     let mut thread_id = String::new();
     for line in BufReader::new(f).lines().map_while(|l| l.ok()) {
@@ -105,6 +110,9 @@ fn parse_rollout_file(path: &Path, records: &mut Vec<Record>) {
         if thread_id.is_empty() {
             continue;
         }
+        // 与 Go 语义一致：即使该事件因时间戳等问题未能产出记录，
+        // 线程仍标记为"已有 token 统计"，日志兜底不再重复计入。
+        with_token_count.insert(thread_id.clone());
         let Ok(info) = serde_json::from_value::<TokenCountInfo>(
             ev.payload.get("info").cloned().unwrap_or(serde_json::Value::Null),
         ) else {
@@ -206,8 +214,12 @@ pub fn load_log_models(logs_db: &Path) -> BTreeMap<String, String> {
 pub fn load_log_fallback(
     logs_db: &Path,
     state_db: &Path,
+    skip_threads: &BTreeSet<String>,
     since: i64,
 ) -> (Vec<Record>, i64) {
+    // 注意：Go 原版的同名查询写了 `AND ts > ?` 却未传参（db.Query(sql) 无 since），
+    // 导致 modernc 报 "missing argument" 后整个日志兜底静默失效，Codex 一直少算。
+    // 这里必须显式传 since。
     let mut records = Vec::new();
     if !logs_db.exists() {
         return (records, since);
@@ -247,6 +259,10 @@ pub fn load_log_fallback(
             max_ts = ts;
         }
         if thread_id.is_empty() {
+            continue;
+        }
+        // 已有 rollout token_count 事件的线程不再走日志兜底（防重复计数）
+        if skip_threads.contains(&thread_id) {
             continue;
         }
         let turn_id = turn_id_re

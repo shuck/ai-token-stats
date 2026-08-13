@@ -2,9 +2,7 @@ use crate::ui::App;
 use egui::Context;
 use std::sync::{Arc, Mutex};
 use tray_icon::menu::{Menu, MenuItem};
-use tray_icon::{Icon, MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
-
-const DOUBLE_CLICK_MS: u128 = 500;
+use tray_icon::{Icon, MouseButton, TrayIcon, TrayIconBuilder, TrayIconEvent};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Action {
@@ -16,7 +14,6 @@ pub enum Action {
 }
 
 pub struct TrayState {
-    pub last_click: Mutex<std::time::Instant>,
     pub pending_action: Mutex<Option<Action>>,
 }
 
@@ -41,7 +38,6 @@ pub fn create_tray(ctx: Context) -> (Arc<TrayState>, TrayIcon) {
         .expect("tray");
 
     let state = Arc::new(TrayState {
-        last_click: Mutex::new(std::time::Instant::now()),
         pending_action: Mutex::new(None),
     });
 
@@ -73,18 +69,13 @@ pub fn create_tray(ctx: Context) -> (Arc<TrayState>, TrayIcon) {
         }
         if let Ok(TrayIconEvent::Click {
             button: MouseButton::Left,
-            button_state: MouseButtonState::Up,
             ..
         }) = TrayIconEvent::receiver().try_recv()
         {
-            let now = std::time::Instant::now();
-            let mut last = s.last_click.lock().unwrap();
-            let dbl = last.elapsed().as_millis() <= DOUBLE_CLICK_MS;
-            *last = now;
-            if dbl {
-                *s.pending_action.lock().unwrap() = Some(Action::Open);
-                ctx.request_repaint();
-            }
+            // tray-icon 在 Windows 上不处理 WM_LBUTTONDBLCLK，
+            // 双击事件时序不可靠；改为任意左键点击即打开面板（双击同样生效）。
+            *s.pending_action.lock().unwrap() = Some(Action::Open);
+            ctx.request_repaint();
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
     });

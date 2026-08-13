@@ -47,7 +47,20 @@ pub fn draw_chart(ui: &mut egui::Ui, rep: &Report, agent: &str) {
         egui::Sense::hover(),
     );
     let painter = ui.painter();
-    let plot = rect.shrink2(egui::vec2(24.0, 16.0));
+    // 标题区（顶部 30px）+ 图例区（底部 22px）
+    let title_bottom = rect.top() + 30.0;
+    let legend_top = rect.bottom() - 22.0;
+    let plot = egui::Rect::from_min_max(
+        egui::pos2(rect.left() + 24.0, title_bottom),
+        egui::pos2(rect.right() - 24.0, legend_top - 8.0),
+    );
+    painter.text(
+        egui::pos2(rect.center().x, rect.top() + 6.0),
+        egui::Align2::CENTER_TOP,
+        "AI Token 统计",
+        egui::FontId::proportional(14.0),
+        egui::Color32::from_rgb(30, 30, 30),
+    );
     let bottom = plot.bottom();
     let max_total = rep
         .daily
@@ -103,6 +116,32 @@ pub fn draw_chart(ui: &mut egui::Ui, rep: &Report, agent: &str) {
                 egui::Color32::from_rgb(60, 60, 60),
             );
         }
+    }
+
+    // 图例
+    let mut legend_x = plot.left();
+    let mut legend_y = legend_top + 2.0;
+    for (ki, key) in keys.iter().enumerate() {
+        if legend_x + 130.0 > plot.right() {
+            legend_x = plot.left();
+            legend_y += 18.0;
+        }
+        painter.rect_filled(
+            egui::Rect::from_min_size(
+                egui::pos2(legend_x, legend_y + 2.0),
+                egui::vec2(10.0, 10.0),
+            ),
+            0.0,
+            PALETTE[ki % PALETTE.len()],
+        );
+        painter.text(
+            egui::pos2(legend_x + 14.0, legend_y),
+            egui::Align2::LEFT_TOP,
+            key,
+            egui::FontId::proportional(10.0),
+            egui::Color32::from_rgb(60, 60, 60),
+        );
+        legend_x += 130.0;
     }
 
     if let Some(day) = hover_day {

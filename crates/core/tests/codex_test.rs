@@ -1,4 +1,6 @@
 use ai_token_stats_core::codex::load_codex_records;
+use ai_token_stats_core::codex::load_log_fallback;
+use rusqlite::Connection;
 use std::collections::BTreeSet;
 use std::fs;
 
@@ -21,7 +23,7 @@ fn codex_rollout_jsonl_parses_token_count() {
 "#;
     fs::write(&file, body).unwrap();
     let set = BTreeSet::from([file.clone()]);
-    let records = load_codex_records(&[file.clone()], Some(&set));
+    let (records, _) = load_codex_records(&[file.clone()], Some(&set));
     assert_eq!(records.len(), 1);
     assert_eq!(records[0].usage.input, 100);
     assert_eq!(records[0].usage.cached, 50);
@@ -29,4 +31,32 @@ fn codex_rollout_jsonl_parses_token_count() {
     assert_eq!(records[0].usage.total, 120);
     assert_eq!(records[0].context_window, Some(200000));
     fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn log_fallback_skips_threads_with_rollout() {
+    let dir = std::env::temp_dir().join(format!("ats-codex-log-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let _guard = Guard(dir.clone());
+    let logs = dir.join("logs.sqlite");
+    let conn = Connection::open(&logs).unwrap();
+    conn.execute_batch(
+        "CREATE TABLE logs (ts INTEGER, thread_id TEXT, feedback_log_body TEXT);",
+    )
+    .unwrap();
+    let body1 = "codex.turn.token_usage.input_tokens=100 codex.turn.token_usage.total_tokens=100 turn.id=turn1 model=gpt-5";
+    let body2 = "codex.turn.token_usage.input_tokens=50 codex.turn.token_usage.total_tokens=50 turn.id=turn2 model=gpt-4o";
+    conn.execute(
+        "INSERT INTO logs(ts, thread_id, feedback_log_body) VALUES (1000, 't1', ?1), (2000, 't2', ?2)",
+        rusqlite::params![body1, body2],
+    )
+    .unwrap();
+
+    let skip: BTreeSet<String> = BTreeSet::from(["t1".to_string()]);
+    let (records, max_ts) = load_log_fallback(&logs, &dir.join("nope.sqlite"), &skip, 0);
+    assert_eq!(records.len(), 1, "t1 已走 rollout，日志兜底应跳过");
+    assert_eq!(records[0].thread_id, "t2");
+    assert_eq!(records[0].usage.input, 50);
+    assert_eq!(max_ts, 2000);
 }
