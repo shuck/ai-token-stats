@@ -70,14 +70,6 @@ impl App {
         ));
         self.report = Some(collect(&cache_path, &self.cfg, self.days, &self.agent));
         if let Some(rep) = &self.report {
-            if let Some(icon) = &self._tray_icon {
-                let tip = format!(
-                    "AI Token 统计 | 今日 {} | 命中 {}",
-                    fmt_tokens(rep.today.total),
-                    fmt_percent(rep.today.hit_rate)
-                );
-                let _ = icon.set_tooltip(Some(tip));
-            }
             crate::logging::log_msg(&format!(
                 "refresh done turns={} agents={:?} models={:?} zcode={} codex={} claude={} opencode={}",
                 rep.totals.turns,
@@ -104,6 +96,23 @@ impl App {
                     .map(|s| s.total)
                     .unwrap_or(0),
             ));
+        }
+        self.update_tray_tooltip();
+    }
+
+    pub fn update_tray_tooltip(&mut self) {
+        if let Some(icon) = &self._tray_icon {
+            let tip = if let Some(rep) = &self.report {
+                format!(
+                    "AI Token 统计 | 今日 {} | 命中 {}",
+                    fmt_tokens(rep.today.total),
+                    fmt_percent(rep.today.hit_rate)
+                )
+            } else {
+                "AI Token 统计".to_string()
+            };
+            crate::logging::log_msg(&format!("tray tooltip set: {tip}"));
+            let _ = icon.set_tooltip(Some(tip));
         }
     }
 }

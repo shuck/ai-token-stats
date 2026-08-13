@@ -167,6 +167,7 @@ fn main() {
             let (state, icon) = tray::create_tray(cc.egui_ctx.clone());
             app.tray = Some(state);
             app._tray_icon = Some(icon);
+            app.update_tray_tooltip();
             Box::new(app)
         }),
     );

@@ -93,6 +93,7 @@ pub fn draw_chart(ui: &mut egui::Ui, rep: &Report, agent: &str) {
     let mut hover_day: Option<&DaySummary> = None;
     let mut hover_idx: Option<usize> = None;
     if let Some(pos) = response.hover_pos() {
+        ui.ctx().request_repaint();
         let idx = ((pos.x - plot.left()) / slot).floor() as usize;
         if idx < rep.daily.len() && pos.x >= plot.left() && pos.x <= plot.right() {
             hover_day = Some(&rep.daily[idx]);
