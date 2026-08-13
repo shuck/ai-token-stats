@@ -191,16 +191,7 @@ impl eframe::App for App {
                 }
 
                 ui.add_space(8.0);
-                egui::Frame::none()
-                    .fill(egui::Color32::from_rgb(250, 252, 255))
-                    .stroke(egui::Stroke::new(
-                        1.0_f32,
-                        egui::Color32::from_rgb(210, 224, 240),
-                    ))
-                    .rounding(egui::Rounding::same(8.0))
-                    .inner_margin(egui::Margin::same(10.0))
-                    .show(ui, |ui| {
-                        ui.horizontal(|ui| {
+                ui.horizontal(|ui| {
                             ui.label("最近天数:");
                             let mut days = self.days.to_string();
                             egui::ComboBox::from_id_source("days")
@@ -243,63 +234,10 @@ impl eframe::App for App {
                                 self.ctx_send_close();
                             }
                         });
-                    });
                 ui.add_space(10.0);
 
                 if let Some(rep) = &self.report {
-                    ui.horizontal_wrapped(|ui| {
-                        let cards = [
-                            (format!("最近 {} 天", rep.days), fmt_tokens(rep.totals.total)),
-                            ("今日".to_string(), fmt_tokens(rep.today.total)),
-                            ("总命中率".to_string(), fmt_percent(rep.totals.hit_rate)),
-                            ("今日命中率".to_string(), fmt_percent(rep.today.hit_rate)),
-                            (
-                                "今日上下文峰值".to_string(),
-                                fmt_percent(rep.today.max_usage_percent),
-                            ),
-                        ];
-                        for (title, value) in cards {
-                            egui::Frame::none()
-                                .fill(egui::Color32::from_rgb(250, 252, 255))
-                                .stroke(egui::Stroke::new(
-                                    1.0_f32,
-                                    egui::Color32::from_rgb(210, 224, 240),
-                                ))
-                                .rounding(egui::Rounding::same(8.0))
-                                .inner_margin(egui::Margin::same(12.0))
-                                .shadow(egui::epaint::Shadow {
-                                    offset: egui::vec2(0.0, 1.0),
-                                    blur: 8.0,
-                                    spread: 0.0,
-                                    color: egui::Color32::from_black_alpha(18),
-                                })
-                                .show(ui, |ui| {
-                                    ui.set_min_size(egui::vec2(152.0, 60.0));
-                                    ui.label(
-                                        egui::RichText::new(title)
-                                            .size(12.5)
-                                            .color(egui::Color32::from_rgb(90, 100, 115)),
-                                    );
-                                    ui.label(
-                                        egui::RichText::new(value)
-                                            .size(20.0)
-                                            .strong()
-                                            .color(egui::Color32::from_rgb(20, 90, 220)),
-                                    );
-                                });
-                        }
-                    });
-                    ui.add_space(8.0);
                     crate::chart::draw_chart(ui, rep, &self.agent);
-                } else {
-                    ui.add_space(40.0);
-                    ui.centered_and_justified(|ui| {
-                        ui.label(
-                            egui::RichText::new("无数据")
-                                .size(18.0)
-                                .color(egui::Color32::from_rgb(120, 120, 120)),
-                        );
-                    });
                 }
             });
 
