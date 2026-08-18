@@ -30,6 +30,14 @@ func formatContextWindow(value *int64) string {
 	return formatTokens(*value)
 }
 
+// displayName 返回 Agent 的界面显示名（DeepSeek 显示为 DSH）。
+func displayName(agent string) string {
+	if agent == agentDeepSeek {
+		return "DSH"
+	}
+	return agent
+}
+
 func (a *app) stackKeys() ([]string, bool) {
 	if a.agent == "" || a.agent == agentAll {
 		return a.data.Agents, true
@@ -309,7 +317,7 @@ func (a *app) paintChart(canvas *walk.Canvas, bounds walk.Rectangle) error {
 			brush.Dispose()
 		}
 		textRect := walk.Rectangle{X: legendX + 14, Y: legendY, Width: 116, Height: 16}
-		_ = drawCentered(canvas, key, textRect, textFont, textColor)
+		_ = drawCentered(canvas, displayName(key), textRect, textFont, textColor)
 		legendX += 130
 		if legendX+130 > plotRight {
 			legendX = plotLeft
@@ -349,7 +357,7 @@ func (a *app) paintChart(canvas *walk.Canvas, bounds walk.Rectangle) error {
 		if stackByAgent {
 			for _, agent := range a.data.Agents {
 				if ad := day.ByAgent[agent]; ad != nil && ad.Total > 0 {
-					lines = append(lines, fmt.Sprintf("%s：%s（命中率 %s）", agent, formatTokens(ad.Total), formatPercent(ad.HitRate)))
+					lines = append(lines, fmt.Sprintf("%s：%s（命中率 %s）", displayName(agent), formatTokens(ad.Total), formatPercent(ad.HitRate)))
 					for _, model := range a.data.Models {
 						if md := ad.ByModel[model]; md != nil && md.Total > 0 {
 							lines = append(lines, fmt.Sprintf("  %s：%s（命中率 %s）", model, formatTokens(md.Total), formatPercent(md.HitRate)))

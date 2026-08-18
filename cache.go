@@ -52,8 +52,8 @@ func openCache() (*sql.DB, error) {
 		db.Close()
 		return nil, err
 	}
-	// 迁移：agentDeepSeek 曾命名为 "DeepSeek"，清理旧命名残留，避免幽灵 Agent。
-	_, _ = db.Exec(`DELETE FROM records_v2 WHERE agent = 'DeepSeek' OR source = 'DeepSeek'`)
+	// 迁移：清除上一版临时命名为 "DSH" 的残留记录（Agent 数据身份仍为 DeepSeek）。
+	_, _ = db.Exec(`DELETE FROM records_v2 WHERE agent = 'DSH' OR source = 'DSH'`)
 	return db, nil
 }
 
@@ -242,7 +242,14 @@ func ensureCached(agent string) error {
 	}
 
 	if agent == agentAll || agent == agentDeepSeek {
-		since := getWatermark(db, "dsh-ts")
+		// 缓存里没有 DeepSeek 记录时忽略水位线（全量重建），
+		// 避免迁移/清理后只同步增量导致数据缺失。
+		var haveRecords int
+		_ = db.QueryRow(`SELECT COUNT(*) FROM records_v2 WHERE source = ?`, agentDeepSeek).Scan(&haveRecords)
+		since := int64(0)
+		if haveRecords > 0 {
+			since = getWatermark(db, "deepseek-ts")
+		}
 		records := loadDeepSeekRecords(since)
 		maxTs := since
 		for _, r := range records {
@@ -254,7 +261,7 @@ func ensureCached(agent string) error {
 			return err
 		}
 		if maxTs > since {
-		if err := setWatermark(db, "dsh-ts", maxTs); err != nil {
+		if err := setWatermark(db, "deepseek-ts", maxTs); err != nil {
 				return err
 			}
 		}

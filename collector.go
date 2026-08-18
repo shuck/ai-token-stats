@@ -25,7 +25,7 @@ const (
 	agentZcode    = "ZCode"
 	agentClaude   = "Claude"
 	agentOpenCode = "OpenCode"
-	agentDeepSeek = "DSH"
+	agentDeepSeek = "DeepSeek"
 )
 
 var shanghai *time.Location
