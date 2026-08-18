@@ -1,10 +1,10 @@
 # AI Token 统计
 
-Windows 桌面（系统托盘）工具，汇总本机 Codex、ZCode、Claude Code、OpenCode 等 AI 编程助手的 token 消耗，并以卡片和堆叠柱状图的形式展示。
+Windows 桌面（系统托盘）工具，汇总本机 Codex、ZCode、Claude Code、OpenCode、DeepSeek Harness 等 AI 编程助手的 token 消耗，并以卡片和堆叠柱状图的形式展示。
 
 ## 功能特性
 
-- 多 Agent 聚合统计：Codex / ZCode / Claude Code / OpenCode，支持按 Agent 或按模型查看
+- 多 Agent 聚合统计：Codex / ZCode / Claude Code / OpenCode / DeepSeek Harness，支持按 Agent 或按模型查看
 - 每日堆叠柱状图，悬停可查看当天明细（轮次、输入/缓存/输出/推理 token、上下文窗口等）
 - 顶部摘要卡片：区间总用量、今日用量、总命中率、今日命中率、今日上下文峰值
 - 时间范围切换：最近 7 / 14 / 30 / 90 天
@@ -29,9 +29,9 @@ Windows 桌面（系统托盘）工具，汇总本机 Codex、ZCode、Claude Cod
 
 各 Agent 数据路径由程序自动发现：
 
-1. 环境变量：Codex 查 `CODEX_HOME`，ZCode 查 `ZCODE_DATA`。
-2. 默认位置：`~/.codex`、`~/.claude/projects`、`~/.local/share/opencode/opencode.db`。
-3. 受限目录扫描（深度 ≤ 4、限时限量）：按特征识别 Codex（`logs_2.sqlite` 或 `sessions`+`archived_sessions`）、ZCode（含 `message` 表的 `db.sqlite`）、Claude（`.claude\projects`）、OpenCode（含 `session` 表的 `opencode.db`）。
+1. 环境变量：Codex 查 `CODEX_HOME`，ZCode 查 `ZCODE_DATA`，DeepSeek Harness 查 `DSH_HOME`。
+2. 默认位置：`~/.codex`、`~/.claude/projects`、`~/.local/share/opencode/opencode.db`、`~/.dsh`。
+3. 受限目录扫描（深度 ≤ 4、限时限量）：按特征识别 Codex（`logs_2.sqlite` 或 `sessions`+`archived_sessions`）、ZCode（含 `message` 表的 `db.sqlite`）、Claude（`.claude\projects`）、OpenCode（含 `session` 表的 `opencode.db`）、DeepSeek Harness（含 `storages/session_projcache.json` 的 `.dsh` 目录）。
 
 发现结果保存在 exe 同目录的 `config.json` 中。缓存的路径失效时，程序自动重新发现并更新；仍找不到时可通过托盘菜单「设置 Agent 路径…」手动指定。「重新扫描路径」可强制重扫全部 Agent。
 

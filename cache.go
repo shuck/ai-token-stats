@@ -239,6 +239,25 @@ func ensureCached(agent string) error {
 		}
 	}
 
+	if agent == agentAll || agent == agentDeepSeek {
+		since := getWatermark(db, "deepseek-ts")
+		records := loadDeepSeekRecords(since)
+		maxTs := since
+		for _, r := range records {
+			if r.Ts > maxTs {
+				maxTs = r.Ts
+			}
+		}
+		if err := insertRecords(db, agentDeepSeek, records); err != nil {
+			return err
+		}
+		if maxTs > since {
+			if err := setWatermark(db, "deepseek-ts", maxTs); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 

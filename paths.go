@@ -106,6 +106,12 @@ func validateAgentPath(agent, path string) bool {
 			return false
 		}
 		return hasSessionTable(path)
+	case agentDeepSeek:
+		if !info.IsDir() {
+			return false
+		}
+		_, err := os.Stat(filepath.Join(path, "storages", "session_projcache.json"))
+		return err == nil
 	}
 	return false
 }
@@ -171,6 +177,13 @@ func knownCandidates(agent string) []string {
 	case agentOpenCode:
 		if home != "" {
 			return []string{filepath.Join(home, ".local", "share", "opencode", "opencode.db")}
+		}
+	case agentDeepSeek:
+		if h := os.Getenv("DSH_HOME"); h != "" {
+			return []string{h}
+		}
+		if home != "" {
+			return []string{filepath.Join(home, ".dsh")}
 		}
 	}
 	return nil
@@ -299,7 +312,7 @@ func matchAgentDir(agent, path string) bool {
 	return false
 }
 
-var allAgents = []string{agentCodex, agentZcode, agentClaude, agentOpenCode}
+var allAgents = []string{agentCodex, agentZcode, agentClaude, agentOpenCode, agentDeepSeek}
 
 // Runtime locations, set once by initPaths.
 var (
@@ -375,5 +388,6 @@ func logsDB() string       { return filepath.Join(codexHome(), "logs_2.sqlite") 
 func stateDB() string      { return filepath.Join(codexHome(), "state_5.sqlite") }
 func zcodeDB() string      { return agentPaths[agentZcode] }
 func claudeRoot() string   { return agentPaths[agentClaude] }
-func opencodeDB() string   { return agentPaths[agentOpenCode] }
-func cacheDB() string      { return cacheDBPath }
+func opencodeDB() string      { return agentPaths[agentOpenCode] }
+func deepSeekHome() string    { return agentPaths[agentDeepSeek] }
+func cacheDB() string         { return cacheDBPath }

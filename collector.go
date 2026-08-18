@@ -2,8 +2,10 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"database/sql"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/klauspost/compress/zstd"
 	_ "modernc.org/sqlite"
 )
 
@@ -22,6 +25,7 @@ const (
 	agentZcode    = "ZCode"
 	agentClaude   = "Claude"
 	agentOpenCode = "OpenCode"
+	agentDeepSeek = "DeepSeek"
 )
 
 var shanghai *time.Location
@@ -865,6 +869,165 @@ func summarize(records []record, days int) report {
 	}
 }
 
+// DeepSeek Harness JSONL event structures
+type deepSeekEvent struct {
+	Type string          `json:"type"`
+	Seq  int64           `json:"seq"`
+	Time int64           `json:"time"`
+	Data json.RawMessage `json:"data"`
+	ID   string          `json:"id"`
+	CreatedAt int64      `json:"createdAt"`
+}
+
+type deepSeekContextData struct {
+	ContextWindow int64 `json:"contextWindow"`
+}
+
+type deepSeekUsageChunk struct {
+	Type  string `json:"type"`
+	Usage struct {
+		InputTokens     int64 `json:"inputTokens"`
+		OutputTokens    int64 `json:"outputTokens"`
+		CacheReadTokens int64 `json:"cacheReadTokens"`
+		CacheWriteTokens int64 `json:"cacheWriteTokens"`
+	} `json:"usage"`
+}
+
+type deepSeekChunkData struct {
+	Turn  int64              `json:"turn"`
+	Step  int64              `json:"step"`
+	Chunk deepSeekUsageChunk `json:"chunk"`
+}
+
+func loadDeepSeekRecords(since int64) []record {
+	sessionsDir := filepath.Join(deepSeekHome(), "sessions")
+	if _, err := os.Stat(sessionsDir); err != nil {
+		return nil
+	}
+
+	records := []record{}
+	_ = filepath.Walk(sessionsDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(strings.ToLower(info.Name()), ".jsonl.zstd") {
+			return nil
+		}
+		sessionRecords := loadDeepSeekSession(path, since)
+		records = append(records, sessionRecords...)
+		return nil
+	})
+	return records
+}
+
+func loadDeepSeekSession(path string, since int64) []record {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer file.Close()
+
+	// Read and decompress zstd
+	dctx, err := zstd.NewReader(file)
+	if err != nil {
+		return nil
+	}
+	defer dctx.Close()
+
+	// Read decompressed data
+	var buf []byte
+	buf, err = io.ReadAll(dctx)
+	if err != nil {
+		return nil
+	}
+
+	var sessionID string
+	var createdAt int64
+	var contextWindow *int64
+	var model string
+	var records []record
+
+	scanner := bufio.NewScanner(bytes.NewReader(buf))
+	scanner.Buffer(make([]byte, 1024*1024), 16*1024*1024)
+
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		var event deepSeekEvent
+		if json.Unmarshal(line, &event) != nil {
+			continue
+		}
+
+		switch event.Type {
+		case "session":
+			sessionID = event.ID
+			createdAt = event.CreatedAt
+
+		case "request/context":
+			var ctx deepSeekContextData
+			if json.Unmarshal(event.Data, &ctx) == nil && ctx.ContextWindow > 0 {
+				contextWindow = &ctx.ContextWindow
+			}
+
+		case "request/header":
+			// Extract model name from header
+			var headerData struct {
+				Header struct {
+					Config struct {
+						Model string `json:"model"`
+					} `json:"config"`
+				} `json:"header"`
+			}
+			if json.Unmarshal(event.Data, &headerData) == nil && headerData.Header.Config.Model != "" {
+				model = headerData.Header.Config.Model
+			}
+
+		case "assistant/chunk":
+			var chunkData deepSeekChunkData
+			if json.Unmarshal(event.Data, &chunkData) != nil || chunkData.Chunk.Type != "usage" {
+				continue
+			}
+			ts := event.Time
+			if ts == 0 || ts < since || sessionID == "" {
+				continue
+			}
+			u := chunkData.Chunk.Usage
+			if u.InputTokens == 0 && u.OutputTokens == 0 {
+				continue
+			}
+			modelName := model
+			if modelName == "" {
+				modelName = "unknown"
+			}
+			// DSH 的 inputTokens 仅含未缓存输入，cacheRead 单独计。
+			// 与其他 Agent（ZCode/Claude）口径一致：输入含缓存读取，命中率才有意义。
+			inputTotal := u.InputTokens + u.CacheReadTokens
+			records = append(records, record{
+				ThreadID: sessionID,
+				Agent:    agentDeepSeek,
+				Model:    modelName,
+				Key:      "dsh-" + sessionID + "-" + strconv.FormatInt(event.Seq, 10),
+				Path:     path,
+				Ts:       ts,
+				Date:     dateKey(ts),
+				Usage: usage{
+					Input:      inputTotal,
+					Cached:     u.CacheReadTokens,
+					CacheWrite: u.CacheWriteTokens,
+					Output:     u.OutputTokens,
+					Reasoning:  0,
+					Total:      inputTotal + u.OutputTokens,
+				},
+				ContextWindow: contextWindow,
+			})
+		}
+	}
+
+	if sessionID == "" || createdAt == 0 {
+		return nil
+	}
+	return records
+}
+
 func collect(days int, agent string) report {
 	if err := ensureCached(agent); err == nil {
 		return summarize(loadCacheRecords(agent), days)
@@ -884,6 +1047,9 @@ func collect(days int, agent string) report {
 	}
 	if agent == agentAll || agent == agentOpenCode {
 		records = append(records, loadOpenCodeRecords(0)...)
+	}
+	if agent == agentAll || agent == agentDeepSeek {
+		records = append(records, loadDeepSeekRecords(0)...)
 	}
 	return summarize(records, days)
 }

@@ -234,7 +234,7 @@ func (a *app) run() error {
 	if err != nil {
 		return err
 	}
-	if err := agentCombo.SetModel([]string{"全部", "Codex", "ZCode", "Claude", "OpenCode"}); err != nil {
+	if err := agentCombo.SetModel([]string{"全部", "Codex", "ZCode", "Claude", "OpenCode", "DeepSeek"}); err != nil {
 		return err
 	}
 	if err := agentCombo.SetCurrentIndex(0); err != nil {
@@ -424,6 +424,8 @@ func (a *app) updateAgent() {
 		a.agent = agentClaude
 	case "OpenCode":
 		a.agent = agentOpenCode
+	case "DeepSeek":
+		a.agent = agentDeepSeek
 	default:
 		a.agent = agentAll
 	}
