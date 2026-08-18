@@ -52,6 +52,8 @@ func openCache() (*sql.DB, error) {
 		db.Close()
 		return nil, err
 	}
+	// 迁移：agentDeepSeek 曾命名为 "DeepSeek"，清理旧命名残留，避免幽灵 Agent。
+	_, _ = db.Exec(`DELETE FROM records_v2 WHERE agent = 'DeepSeek' OR source = 'DeepSeek'`)
 	return db, nil
 }
 
@@ -240,7 +242,7 @@ func ensureCached(agent string) error {
 	}
 
 	if agent == agentAll || agent == agentDeepSeek {
-		since := getWatermark(db, "deepseek-ts")
+		since := getWatermark(db, "dsh-ts")
 		records := loadDeepSeekRecords(since)
 		maxTs := since
 		for _, r := range records {
@@ -252,7 +254,7 @@ func ensureCached(agent string) error {
 			return err
 		}
 		if maxTs > since {
-			if err := setWatermark(db, "deepseek-ts", maxTs); err != nil {
+		if err := setWatermark(db, "dsh-ts", maxTs); err != nil {
 				return err
 			}
 		}

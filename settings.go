@@ -40,7 +40,7 @@ func (a *app) showSettingsDialog() {
 		{agentZcode, "ZCode db.sqlite", false},
 		{agentClaude, "Claude projects 目录", true},
 		{agentOpenCode, "OpenCode opencode.db", false},
-		{agentDeepSeek, "DeepSeek .dsh 目录", true},
+		{agentDeepSeek, "DSH .dsh 目录", true},
 	} {
 		comp, err := walk.NewComposite(dlg)
 		if err != nil {

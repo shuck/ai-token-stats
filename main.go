@@ -81,6 +81,7 @@ func acquireSingleInstance() (windows.Handle, bool, error) {
 }
 
 func (a *app) refresh() {
+	logMsg("refresh days=%d agent=%s", a.days, a.agent)
 	a.ensurePaths()
 	if a.agent == "" {
 		a.agent = agentAll
@@ -93,6 +94,23 @@ func (a *app) refresh() {
 	if a.ni != nil {
 		_ = a.ni.SetToolTip(fmt.Sprintf("AI Token 统计 | 今日 %s | 命中 %s", formatTokens(r.Today.Total), formatPercent(r.Today.HitRate)))
 	}
+	var zcode, codex, claude, opencode, dsh int64
+	for agent, ad := range r.Totals.ByAgent {
+		switch agent {
+		case agentZcode:
+			zcode = ad.Total
+		case agentCodex:
+			codex = ad.Total
+		case agentClaude:
+			claude = ad.Total
+		case agentOpenCode:
+			opencode = ad.Total
+		case agentDeepSeek:
+			dsh = ad.Total
+		}
+	}
+	logMsg("refresh done turns=%d agents=%v zcode=%d codex=%d claude=%d opencode=%d dsh=%d",
+		r.Totals.Turns, r.Agents, zcode, codex, claude, opencode, dsh)
 }
 
 func (a *app) ensurePaths() {
@@ -148,6 +166,7 @@ func (a *app) scanAll(force bool) bool {
 			fmt.Fprintln(os.Stderr, "save config:", err)
 		}
 	}
+	logMsg("scanAll force=%v changed=%v agents=%v", force, changed, agentPaths)
 	return changed
 }
 
@@ -234,7 +253,7 @@ func (a *app) run() error {
 	if err != nil {
 		return err
 	}
-	if err := agentCombo.SetModel([]string{"全部", "Codex", "ZCode", "Claude", "OpenCode", "DeepSeek"}); err != nil {
+	if err := agentCombo.SetModel([]string{"全部", "Codex", "ZCode", "Claude", "OpenCode", "DSH"}); err != nil {
 		return err
 	}
 	if err := agentCombo.SetCurrentIndex(0); err != nil {
@@ -300,13 +319,20 @@ func (a *app) run() error {
 
 	openAction := walk.NewAction()
 	_ = openAction.SetText("打开面板")
-	openAction.Triggered().Attach(a.showWindow)
+	openAction.Triggered().Attach(func() {
+		logMsg("tray action: open")
+		a.showWindow()
+	})
 	refreshAction := walk.NewAction()
 	_ = refreshAction.SetText("刷新")
-	refreshAction.Triggered().Attach(a.refresh)
+	refreshAction.Triggered().Attach(func() {
+		logMsg("tray action: refresh")
+		a.refresh()
+	})
 	rescanAction := walk.NewAction()
 	_ = rescanAction.SetText("重新扫描路径")
 	rescanAction.Triggered().Attach(func() {
+		logMsg("tray action: rescan")
 		if a.scanning {
 			return
 		}
@@ -330,10 +356,14 @@ func (a *app) run() error {
 	})
 	settingsAction := walk.NewAction()
 	_ = settingsAction.SetText("设置 Agent 路径…")
-	settingsAction.Triggered().Attach(func() { a.showSettingsDialog() })
+	settingsAction.Triggered().Attach(func() {
+		logMsg("tray action: settings")
+		a.showSettingsDialog()
+	})
 	exitAction := walk.NewAction()
 	_ = exitAction.SetText("退出")
 	exitAction.Triggered().Attach(func() {
+		logMsg("tray action: exit")
 		a.exiting = true
 		_ = ni.Dispose()
 		walk.App().Exit(0)
@@ -403,6 +433,7 @@ func (a *app) run() error {
 				fmt.Printf("  [%s] total=%d turns=%d\n", agent, ad.Total, ad.Turns)
 			}
 		}
+		logMsg("smoke result turns=%d agents=%v models=%v", a.data.Totals.Turns, a.data.Agents, a.data.Models)
 		_ = ni.Dispose()
 		os.Exit(0)
 	}
@@ -424,7 +455,7 @@ func (a *app) updateAgent() {
 		a.agent = agentClaude
 	case "OpenCode":
 		a.agent = agentOpenCode
-	case "DeepSeek":
+	case "DSH":
 		a.agent = agentDeepSeek
 	default:
 		a.agent = agentAll
@@ -447,6 +478,8 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	initLog(appDir)
+	logMsg("startup args=%v app_dir=%s", os.Args[1:], appDir)
 
 	hold := false
 	a := &app{cfg: cfg}

@@ -339,6 +339,7 @@ func initPaths() (*config, error) {
 		}
 		cfg = newConfig()
 	}
+	delete(cfg.Agents, "DeepSeek") // 迁移：旧命名残留键
 	for _, agent := range allAgents {
 		if p := cfg.Agents[agent].Path; pathExists(p) {
 			agentPaths[agent] = p

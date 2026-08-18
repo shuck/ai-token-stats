@@ -1,6 +1,7 @@
 # Runtime state, regenerated per machine
 config.json
 ai-token-stats-cache.db
+ai-token-stats.log
 config.json.corrupt-*
 codex-usage.exe
 ai-token-stats.exe~
