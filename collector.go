@@ -654,7 +654,7 @@ func loadOpenCodeRecords(since int64) []record {
 		if err := rows.Scan(&id, &ts, &model, &input, &output, &reasoning, &cacheRead, &cacheWrite); err != nil {
 			continue
 		}
-		if input == 0 && output == 0 {
+		if input == 0 && output == 0 && cacheRead == 0 {
 			continue
 		}
 		modelName := model
@@ -667,6 +667,9 @@ func loadOpenCodeRecords(since int64) []record {
 		if modelName == "" {
 			modelName = "unknown"
 		}
+		// OpenCode 的 tokens_input 不含缓存读取；与其他 Agent 口径一致，
+		// 输入 = 未缓存输入 + 缓存读取，命中率才正确。
+		inputTotal := input + cacheRead
 		records = append(records, record{
 			ThreadID: "opencode",
 			Agent:    agentOpenCode,
@@ -676,12 +679,12 @@ func loadOpenCodeRecords(since int64) []record {
 			Ts:       ts,
 			Date:     dateKey(ts),
 			Usage: usage{
-				Input:      input,
+				Input:      inputTotal,
 				Cached:     cacheRead,
 				CacheWrite: cacheWrite,
 				Output:     output,
 				Reasoning:  reasoning,
-				Total:      input + output,
+				Total:      inputTotal + output,
 			},
 			ContextWindow: nil,
 		})
